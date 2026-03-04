@@ -273,6 +273,14 @@ AGENT_CONFIGS = [
     #     "provider": "anthropic",
     #     "benchmarks": ["taubench_airline"],
     # },
+    # {
+    #     "name": "taubench_toolcalling_claude_opus_4_6",
+    #     "agent_dir": "agents/taubench_tool_calling",
+    #     "agent_function": "tool_calling.run",
+    #     "model_name": "claude-opus-4-6",
+    #     "provider": "anthropic",
+    #     "benchmarks": ["taubench_airline"],
+    # },
 
     # -------------------------------------------------------------------------
     # Google Gemini Models
@@ -335,6 +343,14 @@ AGENT_CONFIGS = [
     #     "agent_dir": "agents/claude_code_agent",
     #     "agent_function": "main.run",
     #     "model_name": "claude-opus-4-5",
+    #     "provider": "anthropic",
+    #     "benchmarks": ["taubench_airline"],
+    # },
+    # {
+    #     "name": "taubench_claude_code_opus_4_6",
+    #     "agent_dir": "agents/claude_code_agent",
+    #     "agent_function": "main.run",
+    #     "model_name": "claude-opus-4-6",
     #     "provider": "anthropic",
     #     "benchmarks": ["taubench_airline"],
     # },
@@ -505,6 +521,17 @@ AGENT_CONFIGS = [
     #     "agent_dir": "agents/hal_generalist_agent",
     #     "agent_function": "main.run",
     #     "model_name": "openrouter/anthropic/claude-opus-4.5",
+    #     "benchmarks": ["gaia"],
+    #     "extra_agent_args": {
+    #         "provider": "openai",  # OpenRouter uses OpenAI-compatible API
+    #         "temperature": 0.0
+    #     }
+    # },
+    # {
+    #     "name": "gaia_generalist_claude_opus_4_6",
+    #     "agent_dir": "agents/hal_generalist_agent",
+    #     "agent_function": "main.run",
+    #     "model_name": "openrouter/anthropic/claude-opus-4.6",
     #     "benchmarks": ["gaia"],
     #     "extra_agent_args": {
     #         "provider": "openai",  # OpenRouter uses OpenAI-compatible API

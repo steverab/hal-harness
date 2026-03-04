@@ -6230,7 +6230,7 @@ def plot_combined_overall_reliability_large(benchmark_data: List[Tuple[str, pd.D
                                 edgecolor='gray', alpha=0.9, linewidth=0.5),
                        zorder=15)
 
-        ax.set_ylabel('Accuracy', fontsize=11)
+        ax.set_ylabel('Accuracy', fontsize=11, fontweight='bold')
         ax.set_ylim(0, 1.05)
         ax.set_yticks(np.arange(0, 1.01, 0.2))
         ax.grid(True, alpha=0.3, linewidth=0.5)
@@ -6279,7 +6279,7 @@ def plot_combined_overall_reliability_large(benchmark_data: List[Tuple[str, pd.D
                                 edgecolor='gray', alpha=0.9, linewidth=0.5),
                        zorder=15)
 
-        ax.set_ylabel(r'Reliability ($\mathcal{R}$)', fontsize=11)
+        ax.set_ylabel(r'Reliability ($\mathcal{R}$)', fontsize=11, fontweight='bold')
         ax.set_ylim(0, 1.05)
         ax.set_yticks(np.arange(0, 1.01, 0.2))
         ax.grid(True, alpha=0.3, linewidth=0.5)
@@ -6325,7 +6325,7 @@ def plot_combined_overall_reliability_large(benchmark_data: List[Tuple[str, pd.D
                                 edgecolor='gray', alpha=0.9, linewidth=0.5),
                        zorder=15)
 
-        ax.set_ylabel(r'Reliability ($\mathcal{R}$)', fontsize=11)
+        ax.set_ylabel(r'Reliability ($\mathcal{R}$)', fontsize=11, fontweight='bold')
         ax.set_xlabel('')
         ax.set_xlim(0, 1.05)
         ax.set_ylim(0, 1.05)
@@ -6335,11 +6335,11 @@ def plot_combined_overall_reliability_large(benchmark_data: List[Tuple[str, pd.D
         ax.tick_params(axis='both', labelsize=10)
         ax.grid(True, alpha=0.3, linewidth=0.5)
         if is_last_row:
-            ax.set_xlabel('Accuracy', fontsize=11)
+            ax.set_xlabel('Accuracy', fontsize=11, fontweight='bold')
         else:
             ax.tick_params(axis='x', labelbottom=False)
 
-    # Shared legend: separate boxes per provider + trend, arranged side by side at top
+    # Shared legend: one row per provider, stacked vertically, spanning full width
     from matplotlib.lines import Line2D
 
     # Group legend entries by provider (use canonical color map for consistency)
@@ -6356,78 +6356,79 @@ def plot_combined_overall_reliability_large(benchmark_data: List[Tuple[str, pd.D
             if dname not in provider_groups[provider]:
                 provider_groups[provider][dname] = (clr, mkr)
 
-    # Build legend boxes, measure them, then place side-by-side centered
     provider_order = ['OpenAI', 'Google', 'Anthropic']
     active_providers = [p for p in provider_order if p in provider_groups]
-    max_cols = {'OpenAI': 3}  # OpenAI gets 3 cols; others default to 2
 
-    legend_kwargs = dict(framealpha=0.95, edgecolor='gray', fontsize=9.5,
-                         handletextpad=0.3, columnspacing=0.5, borderpad=0.4)
+    from matplotlib.legend_handler import HandlerBase
 
-    # First pass: create all legend objects so we can measure their widths
-    legend_objects = []
+    class EmptyHandler(HandlerBase):
+        """Handler that shrinks the handle box to zero width."""
+        def legend_artist(self, legend, orig_handle, fontsize, handlebox):
+            handlebox.width = 0
+            handlebox.xdescent = 0
+            from matplotlib.patches import Rectangle
+            patch = Rectangle((0, 0), 0, 0, visible=False)
+            handlebox.add_artist(patch)
+            return patch
 
-    # Trend line box (placed first = leftmost)
-    trend_handle = [Line2D([0], [1], color='black', linewidth=2, alpha=0.85, label='Trend')]
-    trend_leg = fig.legend(handles=trend_handle,
-                           loc='upper center', bbox_to_anchor=(0.5, 1.08),
-                           ncol=1, **legend_kwargs)
-    legend_objects.append(trend_leg)
+    legend_kwargs = dict(framealpha=0.95, edgecolor='gray', fontsize=10.5,
+                         handletextpad=0.3, columnspacing=0.8, borderpad=0.4)
 
+    # Build rows of handles per provider (provider label + model entries)
+    provider_rows = []
+    label_handles = []  # track provider-name and dummy handles for EmptyHandler
     for provider in active_providers:
         entries = provider_groups[provider]
-        handles = []
+        row = []
+        # Provider name as invisible handle, inline first entry
+        h = Line2D([0], [0], marker='None', linestyle='None', label=f'{provider}:')
+        label_handles.append(h)
+        row.append(h)
         for dname, (clr, mkr) in entries.items():
             legend_mkr = _variant_markers.get(dname, mkr)
-            handles.append(
+            row.append(
                 Line2D([0], [0], marker=legend_mkr, color='none', markerfacecolor=clr,
                        markeredgecolor='black', markeredgewidth=0.8, markersize=8,
                        label=dname)
             )
-        ncol = min(len(handles), max_cols.get(provider, 2))
-        leg = fig.legend(handles=handles, title=provider,
-                         title_fontproperties={'weight': 'bold', 'size': 10},
-                         loc='upper center', bbox_to_anchor=(0.5, 1.08),
-                         ncol=ncol, **legend_kwargs)
-        fig.add_artist(leg)
-        legend_objects.append(leg)
+        provider_rows.append(row)
 
-    # Leave space on the left for row annotations
+    # Pad each row to the same length with invisible blanks so each provider
+    # occupies exactly one line in the grid
+    max_cols = max(len(r) for r in provider_rows)
+    n_rows = len(provider_rows)
+    def _dummy():
+        h = Line2D([0], [0], marker='None', linestyle='None', label=' ')
+        label_handles.append(h)
+        return h
+
+    # Pad rows to max_cols
+    padded_rows = []
+    for row in provider_rows:
+        padded = row + [_dummy() for _ in range(max_cols - len(row))]
+        padded_rows.append(padded)
+
+    # Matplotlib fills ncol legend grids column-major, so reorder handles
+    # so that each provider ends up on its own row
+    reordered = [None] * (n_rows * max_cols)
+    for r, row in enumerate(padded_rows):
+        for c, handle in enumerate(row):
+            reordered[c * n_rows + r] = handle
+
+    # Map provider-name and dummy handles to EmptyHandler (no marker space)
+    handler_map = {h: EmptyHandler() for h in label_handles}
+
+    leg = fig.legend(handles=reordered,
+                     loc='upper center', bbox_to_anchor=(0.50, 1.1),
+                     ncol=max_cols, handler_map=handler_map, **legend_kwargs)
+    # Bold the provider name labels (first entry in each row)
+    texts = leg.get_texts()
+    for r in range(n_rows):
+        # Provider label is at grid position (r, 0) -> linear index 0 * n_rows + r = r
+        texts[r].set_fontweight('bold')
+
+    # Leave space on the left for row annotations and top for legend
     plt.tight_layout(rect=[0.03, 0, 1, 0.96])
-
-    # Second pass: measure actual widths in figure coords and reposition
-    fig.canvas.draw()
-    renderer = fig.canvas.get_renderer()
-    gap = 0.015  # gap between boxes in figure fraction
-
-    widths = []
-    for leg in legend_objects:
-        bb = leg.get_window_extent(renderer)
-        bb_fig = bb.transformed(fig.transFigure.inverted())
-        widths.append(bb_fig.width)
-
-    total_width = sum(widths) + gap * (len(widths) - 1)
-    x_left = 0.5 - total_width / 2  # start x so group is centered slightly right
-
-    y_anchor = 1.08
-
-    # Measure heights so we can vertically center the trend box with provider boxes
-    heights = []
-    for leg in legend_objects:
-        bb = leg.get_window_extent(renderer)
-        bb_fig = bb.transformed(fig.transFigure.inverted())
-        heights.append(bb_fig.height)
-
-    # Trend is the first; provider boxes are the rest
-    provider_max_h = max(heights[1:]) if len(heights) > 1 else heights[0]
-    trend_h = heights[0]
-
-    for leg, w, h in zip(legend_objects, widths, heights):
-        x_center = x_left + w / 2
-        # Shift shorter boxes (trend) down so their vertical center matches the tallest
-        y_offset = (provider_max_h - h) / 2
-        leg.set_bbox_to_anchor((x_center, y_anchor - y_offset), transform=fig.transFigure)
-        x_left += w + gap
 
     # Add benchmark name annotations on the far left of each row
     for row_idx, (benchmark_name, _) in enumerate(benchmark_data):
@@ -6845,6 +6846,7 @@ def _plot_shared_metric(benchmark_data: List[Tuple[str, pd.DataFrame]], output_d
 
     show_ylabel = True
     show_yticks = True
+    show_xticks = True
     show_legend = False
 
     # Determine benchmark order
