@@ -34,6 +34,27 @@ def supports_stop_parameter(model_id: str) -> bool:
 # Replace the function in smolagents
 smolagents.models.supports_stop_parameter = supports_stop_parameter
 
+# Monkey-patch litellm Responses API to fix reasoning.effort='none' validation error
+# GPT-5.4 returns reasoning.effort='none' when no effort is specified, but litellm's
+# Pydantic model only accepts 'minimal', 'low', 'medium', 'high'.
+try:
+    from litellm.llms.openai.responses import transformation as _resp_transform
+    import json as _patch_json
+    _orig_transform_fn = _resp_transform.OpenAIResponsesAPIConfig.transform_response_api_response
+    def _patched_transform_response(self, model, raw_response, logging_obj):
+        try:
+            data = raw_response.json()
+            reasoning = data.get('reasoning')
+            if isinstance(reasoning, dict) and reasoning.get('effort') == 'none':
+                reasoning['effort'] = 'low'
+                raw_response._content = _patch_json.dumps(data).encode('utf-8')
+        except Exception:
+            pass
+        return _orig_transform_fn(self, model, raw_response, logging_obj)
+    _resp_transform.OpenAIResponsesAPIConfig.transform_response_api_response = _patched_transform_response
+except Exception as _patch_err:
+    print(f"Warning: Could not patch litellm Responses API transform: {_patch_err}")
+
 from mdconvert import MarkdownConverter
 
 try:

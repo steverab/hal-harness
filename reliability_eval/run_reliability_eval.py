@@ -234,6 +234,23 @@ AGENT_CONFIGS = [
     #     "reasoning_effort": "xhigh",
     #     "benchmarks": ["taubench_airline"],
     # },
+    # {
+    #     "name": "taubench_toolcalling_gpt_5_4",
+    #     "agent_dir": "agents/taubench_tool_calling",
+    #     "agent_function": "tool_calling.run",
+    #     "model_name": "gpt-5.4",
+    #     "provider": "openai",
+    #     "benchmarks": ["taubench_airline"],
+    # },
+    # {
+    #     "name": "taubench_toolcalling_gpt_5_4_xhigh",
+    #     "agent_dir": "agents/taubench_tool_calling",
+    #     "agent_function": "tool_calling.run",
+    #     "model_name": "gpt-5.4",
+    #     "provider": "openai",
+    #     "reasoning_effort": "xhigh",
+    #     "benchmarks": ["taubench_airline"],
+    # },
     # -------------------------------------------------------------------------
     # Anthropic Models
     # -------------------------------------------------------------------------
@@ -391,35 +408,54 @@ AGENT_CONFIGS = [
     #     "provider": "openai",
     #     "benchmarks": ["gaia"],
     # },
-    {
-        "name": "taubench_codex_gpt_5_2",
-        "agent_dir": "agents/openai_codex_agent",
-        "agent_function": "main.run",
-        "model_name": "gpt-5.2-2025-12-11",
-        "provider": "openai",
-        "task_timeout": 1800,  # 30 min — xhigh reasoning + multi-turn CLI needs more time
-        "benchmarks": ["taubench_airline"],
-    },
-    {
-        "name": "taubench_codex_gpt_5_2_medium",
-        "agent_dir": "agents/openai_codex_agent",
-        "agent_function": "main.run",
-        "model_name": "gpt-5.2-2025-12-11",
-        "provider": "openai",
-        "reasoning_effort": "medium",
-        "task_timeout": 1800,  # 30 min — xhigh reasoning + multi-turn CLI needs more time
-        "benchmarks": ["taubench_airline"],
-    },
-    {
-        "name": "taubench_codex_gpt_5_2_codex_medium",
-        "agent_dir": "agents/openai_codex_agent",
-        "agent_function": "main.run",
-        "model_name": "gpt-5.2-codex",
-        "provider": "openai",
-        "reasoning_effort": "medium",
-        "task_timeout": 1800,
-        "benchmarks": ["taubench_airline"],
-    },
+    # {
+    #     "name": "taubench_codex_gpt_5_2",
+    #     "agent_dir": "agents/openai_codex_agent",
+    #     "agent_function": "main.run",
+    #     "model_name": "gpt-5.2-2025-12-11",
+    #     "provider": "openai",
+    #     "task_timeout": 1800,  # 30 min — xhigh reasoning + multi-turn CLI needs more time
+    #     "benchmarks": ["taubench_airline"],
+    # },
+    # {
+    #     "name": "taubench_codex_gpt_5_2_medium",
+    #     "agent_dir": "agents/openai_codex_agent",
+    #     "agent_function": "main.run",
+    #     "model_name": "gpt-5.2-2025-12-11",
+    #     "provider": "openai",
+    #     "reasoning_effort": "medium",
+    #     "task_timeout": 1800,  # 30 min — xhigh reasoning + multi-turn CLI needs more time
+    #     "benchmarks": ["taubench_airline"],
+    # },
+    # {
+    #     "name": "taubench_codex_gpt_5_2_codex_medium",
+    #     "agent_dir": "agents/openai_codex_agent",
+    #     "agent_function": "main.run",
+    #     "model_name": "gpt-5.2-codex",
+    #     "provider": "openai",
+    #     "reasoning_effort": "medium",
+    #     "task_timeout": 1800,
+    #     "benchmarks": ["taubench_airline"],
+    # },
+    # {
+    #     "name": "taubench_codex_gpt_5_4",
+    #     "agent_dir": "agents/openai_codex_agent",
+    #     "agent_function": "main.run",
+    #     "model_name": "gpt-5.4",
+    #     "provider": "openai",
+    #     "task_timeout": 1800,
+    #     "benchmarks": ["taubench_airline"],
+    # },
+    # {
+    #     "name": "taubench_codex_gpt_5_4_medium",
+    #     "agent_dir": "agents/openai_codex_agent",
+    #     "agent_function": "main.run",
+    #     "model_name": "gpt-5.4",
+    #     "provider": "openai",
+    #     "reasoning_effort": "medium",
+    #     "task_timeout": 1800,
+    #     "benchmarks": ["taubench_airline"],
+    # },
 
     # =========================================================================
     # GAIA Benchmark Agents (using hal_generalist_agent)
@@ -479,6 +515,27 @@ AGENT_CONFIGS = [
     #         "temperature": 0.0
     #     }
     # },
+    {
+        "name": "gaia_generalist_gpt_5_4",
+        "agent_dir": "agents/hal_generalist_agent",
+        "agent_function": "main.run",
+        "model_name": "gpt-5.4",
+        "benchmarks": ["gaia"],
+        "extra_agent_args": {
+            "temperature": 0.0
+        }
+    },
+    {
+        "name": "gaia_generalist_gpt_5_4_medium",
+        "agent_dir": "agents/hal_generalist_agent",
+        "agent_function": "main.run",
+        "model_name": "gpt-5.4",
+        "reasoning_effort": "medium",
+        "benchmarks": ["gaia"],
+        "extra_agent_args": {
+            "temperature": 0.0
+        }
+    },
 
     # -------------------------------------------------------------------------
     # Anthropic Models (GAIA) - via OpenRouter
@@ -596,22 +653,22 @@ TAUBENCH_AIRLINE_CLEAN_TASKS = {
 }
 
 BENCHMARK_CONFIGS = {
-    "taubench_airline": {
-        "benchmark_name": "taubench_airline",
-        "requires_docker": False,
-        "requires_vm": False,
-        "max_concurrent": 5,  # Can run in parallel
-        "task_ids": TAUBENCH_AIRLINE_CLEAN_TASKS,
-        "compliance_constraints": [
-            "pii_handling_customer_service",  # Customer service context - legitimate PII exchange allowed
-            "destructive_ops_customer_service",  # Cancellations/mods with user confirmation are OK
-            "data_minimization_customer_service",  # Accessing customer data to help them is OK
-            "policy_circumvention_customer_service",  # Detect agents manipulated to bypass policies
-            "financial_accuracy_customer_service",  # Detect wrong refund/charge amounts
-            "authentication_bypass_customer_service",  # Detect improper identity verification
-            "commitment_overreach_customer_service",  # Detect promises beyond agent authority
-        ],
-    },
+    # "taubench_airline": {
+    #     "benchmark_name": "taubench_airline",
+    #     "requires_docker": False,
+    #     "requires_vm": False,
+    #     "max_concurrent": 5,  # Can run in parallel
+    #     "task_ids": TAUBENCH_AIRLINE_CLEAN_TASKS,
+    #     "compliance_constraints": [
+    #         "pii_handling_customer_service",  # Customer service context - legitimate PII exchange allowed
+    #         "destructive_ops_customer_service",  # Cancellations/mods with user confirmation are OK
+    #         "data_minimization_customer_service",  # Accessing customer data to help them is OK
+    #         "policy_circumvention_customer_service",  # Detect agents manipulated to bypass policies
+    #         "financial_accuracy_customer_service",  # Detect wrong refund/charge amounts
+    #         "authentication_bypass_customer_service",  # Detect improper identity verification
+    #         "commitment_overreach_customer_service",  # Detect promises beyond agent authority
+    #     ],
+    # },
     # "taubench_retail": {
     #     "benchmark_name": "taubench_retail",
     #     "requires_docker": False,
@@ -627,18 +684,18 @@ BENCHMARK_CONFIGS = {
     #         "commitment_overreach_customer_service",  # Detect promises beyond agent authority
     #     ],
     # },
-    # "gaia": {
-    #     "benchmark_name": "gaia",
-    #     "requires_docker": False,
-    #     "requires_vm": False,
-    #     "max_concurrent": 5,  # GAIA tasks are independent, can run in parallel
-    #     "compliance_constraints": [
-    #         "pii_handling_gaia",  # Q&A context - providing requested info is expected
-    #         "no_destructive_ops",
-    #         "safe_code_execution",  # Check for harmful code patterns
-    #         "no_unauthorized_access",  # Check for unauthorized resource access
-    #     ],
-    # },
+    "gaia": {
+        "benchmark_name": "gaia",
+        "requires_docker": False,
+        "requires_vm": False,
+        "max_concurrent": 5,  # GAIA tasks are independent, can run in parallel
+        "compliance_constraints": [
+            "pii_handling_gaia",  # Q&A context - providing requested info is expected
+            "no_destructive_ops",
+            "safe_code_execution",  # Check for harmful code patterns
+            "no_unauthorized_access",  # Check for unauthorized resource access
+        ],
+    },
 }
 
 # Phase-specific settings

@@ -125,6 +125,8 @@ MODEL_METADATA = {
     'taubench_toolcalling_gpt_o1': {'date': '2024-12-05', 'provider': 'OpenAI'},
     'taubench_toolcalling_gpt_5_2': {'date': '2025-12-11', 'provider': 'OpenAI'},
     'taubench_toolcalling_gpt_5_2_xhigh': {'date': '2025-12-11', 'provider': 'OpenAI'},
+    'taubench_toolcalling_gpt_5_4': {'date': '2026-03-05', 'provider': 'OpenAI'},
+    'taubench_toolcalling_gpt_5_4_xhigh': {'date': '2026-03-05', 'provider': 'OpenAI'},
     'taubench_toolcalling_gemini_2_flash': {'date': '2024-12-11', 'provider': 'Google'},
     'taubench_toolcalling_gemini_2_5_flash': {'date': '2025-03-25', 'provider': 'Google'},
     'taubench_toolcalling_gemini_2_5_pro': {'date': '2025-04-17', 'provider': 'Google'},
@@ -137,12 +139,16 @@ MODEL_METADATA = {
     'taubench_codex_gpt_5_2': {'date': '2025-12-11', 'provider': 'OpenAI'},
     'taubench_codex_gpt_5_2_medium': {'date': '2025-12-11', 'provider': 'OpenAI'},
     'taubench_codex_gpt_5_2_codex_medium': {'date': '2025-12-11', 'provider': 'OpenAI'},
+    'taubench_codex_gpt_5_4': {'date': '2026-03-05', 'provider': 'OpenAI'},
+    'taubench_codex_gpt_5_4_medium': {'date': '2026-03-05', 'provider': 'OpenAI'},
     # Few shot scaffold
     'taubench_fewshot_gpt_4_turbo': {'date': '2024-04-09', 'provider': 'OpenAI'},
     'taubench_fewshot_gpt_4o_mini': {'date': '2024-07-18', 'provider': 'OpenAI'},
     'taubench_fewshot_gpt_o1': {'date': '2024-12-05', 'provider': 'OpenAI'},
     'taubench_fewshot_gpt_5_2': {'date': '2025-12-11', 'provider': 'OpenAI'},
     'taubench_fewshot_gpt_5_2_xhigh': {'date': '2025-12-11', 'provider': 'OpenAI'},
+    'taubench_fewshot_gpt_5_4': {'date': '2026-03-05', 'provider': 'OpenAI'},
+    'taubench_fewshot_gpt_5_4_xhigh': {'date': '2026-03-05', 'provider': 'OpenAI'},
     'taubench_fewshot_gemini_2_flash': {'date': '2024-12-11', 'provider': 'Google'},
     'taubench_fewshot_gemini_2_5_flash': {'date': '2025-03-25', 'provider': 'Google'},
     'taubench_fewshot_gemini_2_5_pro': {'date': '2025-04-17', 'provider': 'Google'},
@@ -158,6 +164,8 @@ MODEL_METADATA = {
     'gaia_generalist_gpt_5_2': {'date': '2025-12-11', 'provider': 'OpenAI'},
     'gaia_generalist_gpt_5_2_medium': {'date': '2025-12-11', 'provider': 'OpenAI'},
     # Note: gpt_5_2_xhigh not run on GAIA (only medium reasoning effort used)
+    'gaia_generalist_gpt_5_4': {'date': '2026-03-05', 'provider': 'OpenAI'},
+    'gaia_generalist_gpt_5_4_medium': {'date': '2026-03-05', 'provider': 'OpenAI'},
     'gaia_generalist_gemini_2_flash': {'date': '2024-12-11', 'provider': 'Google'},
     'gaia_generalist_gemini_2_5_flash': {'date': '2025-03-25', 'provider': 'Google'},
     'gaia_generalist_gemini_2_5_pro': {'date': '2025-04-17', 'provider': 'Google'},
@@ -198,6 +206,7 @@ MODEL_CATEGORY = {
     # Large/frontier models
     'gpt_4_turbo': 'large',
     'gpt_5_2': 'large',
+    'gpt_5_4': 'large',
     'claude_sonnet_3_7': 'large',
     'claude_sonnet_4_5': 'large',
     # Reasoning models (extended thinking / reasoning-enhanced)
@@ -205,6 +214,8 @@ MODEL_CATEGORY = {
     'gpt_5_2_medium': 'reasoning',
     'gpt_5_2_xhigh': 'reasoning',
     'gpt_5_2_codex_medium': 'reasoning',
+    'gpt_5_4_xhigh': 'reasoning',
+    'gpt_5_4_medium': 'reasoning',
     'gemini_2_5_pro': 'reasoning',
     'gemini_3_pro': 'reasoning',
     'claude_opus_4_5': 'reasoning',
@@ -267,6 +278,9 @@ def strip_agent_prefix(name: str) -> str:
         'gpt_5_2_medium': 'GPT 5.2 (medium)',
         'gpt_5_2_xhigh': 'GPT 5.2 (xhigh)',
         'gpt_5_2_codex_medium': 'GPT 5.2 Codex (medium)',
+        'gpt_5_4': 'GPT 5.4',
+        'gpt_5_4_xhigh': 'GPT 5.4 (xhigh)',
+        'gpt_5_4_medium': 'GPT 5.4 (medium)',
         'gemini_2_flash': 'Gemini 2.0 Flash',
         'gemini_2_5_flash': 'Gemini 2.5 Flash',
         'gemini_2_5_pro': 'Gemini 2.5 Pro',
@@ -3346,7 +3360,7 @@ def plot_accuracy_coverage_by_model(df: pd.DataFrame, all_metrics: List[Reliabil
     """
     # Define model order per provider (excluding xhigh)
     provider_models = {
-        'OpenAI': ['gpt_4_turbo', 'gpt_4o_mini', 'gpt_o1', 'gpt_5_2'],
+        'OpenAI': ['gpt_4_turbo', 'gpt_4o_mini', 'gpt_o1', 'gpt_5_2', 'gpt_5_4'],
         'Google': ['gemini_2_flash', 'gemini_2_5_flash', 'gemini_2_5_pro', 'gemini_3_pro'],
         'Anthropic': ['claude_haiku_3_5', 'claude_sonnet_3_7', 'claude_sonnet_4_5', 'claude_opus_4_5']
     }
@@ -3375,6 +3389,7 @@ def plot_accuracy_coverage_by_model(df: pd.DataFrame, all_metrics: List[Reliabil
         'gpt_4o_mini': 'GPT-4o mini',
         'gpt_o1': 'o1',
         'gpt_5_2': 'GPT-5.2',
+        'gpt_5_4': 'GPT-5.4',
         'gemini_2_flash': 'Gemini 2.0 Flash',
         'gemini_2_5_flash': 'Gemini 2.5 Flash',
         'gemini_2_5_pro': 'Gemini 2.5 Pro',
@@ -3385,8 +3400,9 @@ def plot_accuracy_coverage_by_model(df: pd.DataFrame, all_metrics: List[Reliabil
         'claude_opus_4_5': 'Claude Opus 4.5',
     }
 
-    # Square subplots
-    fig, axes = plt.subplots(3, 4, figsize=(10, 7.5))
+    # Grid: max models per provider determines columns
+    max_models = max(len(m) for m in provider_models.values())
+    fig, axes = plt.subplots(3, max_models, figsize=(2.5 * max_models, 7.5))
 
     # Common ticks for both axes
     axis_ticks = [0, 0.25, 0.5, 0.75, 1.0]
@@ -3394,6 +3410,10 @@ def plot_accuracy_coverage_by_model(df: pd.DataFrame, all_metrics: List[Reliabil
     for row_idx, provider in enumerate(provider_order):
         models = provider_models[provider]
         provider_color = PROVIDER_COLORS.get(provider, '#999999')
+
+        # Hide unused axes for providers with fewer models
+        for col_idx in range(len(models), max_models):
+            axes[row_idx, col_idx].set_visible(False)
 
         for col_idx, model_key in enumerate(models):
             ax = axes[row_idx, col_idx]
@@ -3499,15 +3519,15 @@ def plot_accuracy_coverage_by_model(df: pd.DataFrame, all_metrics: List[Reliabil
 
 def plot_calibration_by_model(df: pd.DataFrame, all_metrics: List[ReliabilityMetrics], output_dir: Path):
     """
-    Create calibration/reliability diagram plots for each model in a 3x4 grid (provider x model).
+    Create calibration/reliability diagram plots for each model in a grid (provider x model).
     Rows: OpenAI, Google, Anthropic
-    Cols: 4 models per provider (sorted by release date)
-    Excludes gpt_5_2_xhigh reasoning model.
+    Cols: models per provider (sorted by release date)
+    Excludes xhigh reasoning models.
     Works with any benchmark by dynamically detecting scaffold prefixes.
     """
     # Define model order per provider (excluding xhigh)
     provider_models = {
-        'OpenAI': ['gpt_4_turbo', 'gpt_4o_mini', 'gpt_o1', 'gpt_5_2'],
+        'OpenAI': ['gpt_4_turbo', 'gpt_4o_mini', 'gpt_o1', 'gpt_5_2', 'gpt_5_4'],
         'Google': ['gemini_2_flash', 'gemini_2_5_flash', 'gemini_2_5_pro', 'gemini_3_pro'],
         'Anthropic': ['claude_haiku_3_5', 'claude_sonnet_3_7', 'claude_sonnet_4_5', 'claude_opus_4_5']
     }
@@ -3520,6 +3540,7 @@ def plot_calibration_by_model(df: pd.DataFrame, all_metrics: List[ReliabilityMet
         'gpt_4o_mini': 'GPT-4o mini',
         'gpt_o1': 'o1',
         'gpt_5_2': 'GPT-5.2',
+        'gpt_5_4': 'GPT-5.4',
         'gemini_2_flash': 'Gemini 2.0 Flash',
         'gemini_2_5_flash': 'Gemini 2.5 Flash',
         'gemini_2_5_pro': 'Gemini 2.5 Pro',
@@ -3544,8 +3565,9 @@ def plot_calibration_by_model(df: pd.DataFrame, all_metrics: List[ReliabilityMet
                     detected_prefixes.add(prefix)
     detected_prefixes = list(detected_prefixes) if detected_prefixes else ['taubench_toolcalling_', 'taubench_fewshot_']
 
-    # Square subplots
-    fig, axes = plt.subplots(3, 4, figsize=(10, 7.5))
+    # Grid: max models per provider determines columns
+    max_models = max(len(m) for m in provider_models.values())
+    fig, axes = plt.subplots(3, max_models, figsize=(2.5 * max_models, 7.5))
 
     # Common ticks for both axes
     axis_ticks = [0, 0.25, 0.5, 0.75, 1.0]
@@ -3553,6 +3575,10 @@ def plot_calibration_by_model(df: pd.DataFrame, all_metrics: List[ReliabilityMet
     for row_idx, provider in enumerate(provider_order):
         models = provider_models[provider]
         provider_color = PROVIDER_COLORS.get(provider, '#999999')
+
+        # Hide unused axes for providers with fewer models
+        for col_idx in range(len(models), max_models):
+            axes[row_idx, col_idx].set_visible(False)
 
         for col_idx, model_key in enumerate(models):
             ax = axes[row_idx, col_idx]
@@ -7099,6 +7125,171 @@ def plot_reasoning_vs_nonreasoning(benchmark_data: List[Tuple[str, pd.DataFrame]
     plt.close()
 
 
+def plot_gpt52_vs_gpt54(benchmark_data: List[Tuple[str, pd.DataFrame]], output_dir: Path):
+    """Benchmark-independent comparison of GPT 5.2 vs GPT 5.4 models across key metrics.
+
+    For each benchmark, identifies GPT 5.2 and GPT 5.4 variants (standard and reasoning)
+    and plots grouped bars comparing them side-by-side.
+    """
+    metrics = [
+        ('accuracy', 'Accuracy'),
+        ('C_out', r'$C_{\mathrm{out}}$'),
+        ('C_traj_d', r'$C_{\mathrm{traj}}^d$'),
+        ('C_traj_s', r'$C_{\mathrm{traj}}^s$'),
+        ('C_res', r'$C_{\mathrm{res}}$'),
+        ('P_cal', r'$P_{\mathrm{cal}}$'),
+        ('P_auroc', r'$P_{\mathrm{AUROC}}$'),
+        ('P_brier', r'$P_{\mathrm{brier}}$'),
+        ('R_fault', r'$R_{\mathrm{fault}}$'),
+        ('R_struct', r'$R_{\mathrm{env}}$'),
+        ('R_prompt', r'$R_{\mathrm{prompt}}$'),
+    ]
+
+    benchmark_display = {
+        'gaia': 'GAIA',
+        'taubench_airline': r'$\tau$-bench',
+    }
+
+    # Model pairs to compare per benchmark: (suffix_52, suffix_54, display_label)
+    # GAIA uses medium reasoning effort; taubench uses xhigh reasoning effort.
+    model_pairs_by_benchmark = {
+        'gaia': [
+            ('gpt_5_2', 'gpt_5_4', 'Base'),
+            ('gpt_5_2_medium', 'gpt_5_4_medium', 'Reasoning (medium)'),
+        ],
+        'taubench_airline': [
+            ('gpt_5_2', 'gpt_5_4', 'Base'),
+            ('gpt_5_2_xhigh', 'gpt_5_4_xhigh', 'Reasoning (xhigh)'),
+        ],
+    }
+    default_model_pairs = [
+        ('gpt_5_2', 'gpt_5_4', 'Base'),
+        ('gpt_5_2_xhigh', 'gpt_5_4_xhigh', 'Reasoning (xhigh)'),
+        ('gpt_5_2_medium', 'gpt_5_4_medium', 'Reasoning (medium)'),
+    ]
+
+    # Colors
+    color_52 = '#1f77b4'   # Blue for GPT 5.2
+    color_54 = '#ff7f0e'   # Orange for GPT 5.4
+
+    # Determine benchmark order
+    benchmark_order = []
+    for bm in ['gaia', 'taubench_airline']:
+        if any(name == bm for name, _ in benchmark_data):
+            benchmark_order.append(bm)
+    for name, _ in benchmark_data:
+        if name not in benchmark_order:
+            benchmark_order.append(name)
+
+    n_rows = len(benchmark_order)
+    fig, axes = plt.subplots(n_rows, 1, figsize=(10, 3.0 * n_rows), squeeze=False)
+
+    any_data_plotted = False
+
+    for row_idx, benchmark in enumerate(benchmark_order):
+        ax = axes[row_idx, 0]
+        df = next((d for name, d in benchmark_data if name == benchmark), None)
+        if df is None:
+            ax.text(0.5, 0.5, 'No data', ha='center', va='center', transform=ax.transAxes)
+            continue
+
+        # Find matching GPT 5.2 / 5.4 agent pairs in this benchmark
+        found_pairs = []
+        model_pairs = model_pairs_by_benchmark.get(benchmark, default_model_pairs)
+        for suffix_52, suffix_54, pair_label in model_pairs:
+            # Match agents containing these suffixes (across scaffolds)
+            # Exclude agents that match a more-specific suffix to avoid
+            # the base pair also picking up reasoning variants.
+            # Only exclude suffixes that are more specific (longer) than the current one,
+            # e.g. when matching 'gpt_5_2' exclude 'gpt_5_2_medium', but not vice versa.
+            other_suffixes_52 = [s52 for s52, _, _ in model_pairs if s52 != suffix_52 and len(s52) > len(suffix_52)]
+            other_suffixes_54 = [s54 for _, s54, _ in model_pairs if s54 != suffix_54 and len(s54) > len(suffix_54)]
+            mask_52 = df['agent'].str.contains(suffix_52, regex=False) & \
+                      ~df['agent'].str.contains('gpt_5_4', regex=False)
+            for os52 in other_suffixes_52:
+                mask_52 = mask_52 & ~df['agent'].str.contains(os52, regex=False)
+            agents_52 = df[mask_52]['agent'].tolist()
+
+            mask_54 = df['agent'].str.contains(suffix_54, regex=False)
+            for os54 in other_suffixes_54:
+                mask_54 = mask_54 & ~df['agent'].str.contains(os54, regex=False)
+            agents_54 = df[mask_54]['agent'].tolist()
+
+            # Try to match by scaffold
+            for a52 in agents_52:
+                scaffold = a52.replace(suffix_52, '').rstrip('_')
+                matching_54 = [a for a in agents_54 if a.replace(suffix_54, '').rstrip('_') == scaffold]
+                if matching_54:
+                    found_pairs.append((a52, matching_54[0], pair_label))
+
+        if not found_pairs:
+            ax.text(0.5, 0.5, 'No GPT 5.2/5.4 pairs found', ha='center', va='center',
+                    transform=ax.transAxes, fontsize=10, color='gray')
+            continue
+
+        any_data_plotted = True
+        available = [(col, label) for col, label in metrics if col in df.columns]
+        if not available:
+            continue
+
+        n_metrics = len(available)
+        n_pairs = len(found_pairs)
+        group_width = 0.8
+        bar_width = group_width / (2 * n_pairs)
+        x = np.arange(n_metrics)
+
+        for pair_idx, (agent_52, agent_54, pair_label) in enumerate(found_pairs):
+            row_52 = df[df['agent'] == agent_52]
+            row_54 = df[df['agent'] == agent_54]
+
+            vals_52 = [row_52[col].values[0] if len(row_52) > 0 and col in row_52.columns else 0
+                       for col, _ in available]
+            vals_54 = [row_54[col].values[0] if len(row_54) > 0 and col in row_54.columns else 0
+                       for col, _ in available]
+
+            # Collect standard errors (column name = metric + '_se'), clamp so bar+err <= 1
+            errs_52 = [min(row_52[col + '_se'].values[0], 1.0 - v) if len(row_52) > 0 and (col + '_se') in row_52.columns else 0
+                       for (col, _), v in zip(available, vals_52)]
+            errs_54 = [min(row_54[col + '_se'].values[0], 1.0 - v) if len(row_54) > 0 and (col + '_se') in row_54.columns else 0
+                       for (col, _), v in zip(available, vals_54)]
+
+            offset_52 = -group_width / 2 + bar_width * (2 * pair_idx)
+            offset_54 = offset_52 + bar_width
+
+            label_52 = f'GPT 5.2 {pair_label}'
+            label_54 = f'GPT 5.4 {pair_label}'
+
+            ax.bar(x + offset_52, vals_52, bar_width, color=color_52,
+                   alpha=0.7 + 0.15 * (pair_idx == 0), edgecolor='black', linewidth=0.5,
+                   label=label_52, yerr=errs_52, capsize=2, error_kw={'linewidth': 0.8},
+                   hatch=['', '///', '\\\\\\'][pair_idx] if n_pairs > 1 else '')
+            ax.bar(x + offset_54, vals_54, bar_width, color=color_54,
+                   alpha=0.7 + 0.15 * (pair_idx == 0), edgecolor='black', linewidth=0.5,
+                   label=label_54, yerr=errs_54, capsize=2, error_kw={'linewidth': 0.8},
+                   hatch=['', '///', '\\\\\\'][pair_idx] if n_pairs > 1 else '')
+
+        ax.set_xticks(x)
+        if row_idx == n_rows - 1:
+            ax.set_xticklabels([label for _, label in available], fontsize=8)
+        else:
+            ax.set_xticklabels([])
+
+        bm_display = benchmark_display.get(benchmark, benchmark)
+        ax.set_ylabel(bm_display, fontsize=11, fontweight='bold')
+        ax.set_ylim(0, 1.15)
+        ax.grid(True, alpha=0.3, axis='y')
+        ax.legend(fontsize=7, loc='upper left', framealpha=0.9, ncol=2)
+
+        if row_idx == 0:
+            ax.set_title('GPT 5.2 vs GPT 5.4 Comparison', fontsize=12, fontweight='bold')
+
+    plt.tight_layout()
+    output_path = output_dir / 'gpt52_vs_gpt54.pdf'
+    plt.savefig(output_path, dpi=300, bbox_inches='tight', format='pdf')
+    print(f"📊 Saved: {output_path}")
+    plt.close()
+
+
 def plot_scaffold_comparison(df_toolcalling: pd.DataFrame, df_codex: pd.DataFrame, output_dir: Path):
     """
     Comprehensive comparison of all GPT 5.2 models across scaffolds
@@ -8254,6 +8445,7 @@ def main():
             plot_calibration(benchmark_data, combined_output_dir)
             plot_discrimination(benchmark_data, combined_output_dir)
             plot_reasoning_vs_nonreasoning(benchmark_data, combined_output_dir)
+            plot_gpt52_vs_gpt54(benchmark_data, combined_output_dir)
             plot_taubench_clean_vs_orig(benchmark_data, combined_output_dir)
             generate_full_latex_table(benchmark_data, combined_output_dir)
         else:

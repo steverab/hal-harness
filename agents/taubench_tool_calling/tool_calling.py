@@ -186,6 +186,29 @@ def run(input: dict[str, dict], **kwargs) -> dict[str, str]:
     import litellm
     litellm.drop_params = True
 
+    # ========== LITELLM RESPONSES API WORKAROUND ==========
+    # GPT-5.4 is routed through the Responses API, which returns reasoning.effort="none".
+    # LiteLLM's Pydantic model (ResponsesAPIResponse) doesn't accept "none" as a valid
+    # value, causing a ValidationError. Monkey-patch the response transformation to
+    # rewrite "none" -> "low" before Pydantic validation, covering ALL calls globally.
+    try:
+        from litellm.llms.openai.responses import transformation as _resp_transform
+        import json as _patch_json
+        _orig_transform_fn = _resp_transform.OpenAIResponsesAPIConfig.transform_response_api_response
+        def _patched_transform_response(self, model, raw_response, logging_obj):
+            try:
+                data = raw_response.json()
+                reasoning = data.get('reasoning')
+                if isinstance(reasoning, dict) and reasoning.get('effort') == 'none':
+                    reasoning['effort'] = 'low'
+                    raw_response._content = _patch_json.dumps(data).encode('utf-8')
+            except Exception:
+                pass
+            return _orig_transform_fn(self, model, raw_response, logging_obj)
+        _resp_transform.OpenAIResponsesAPIConfig.transform_response_api_response = _patched_transform_response
+    except Exception as _patch_err:
+        print(f"Warning: Could not patch litellm Responses API transform: {_patch_err}")
+
     # ========== RELIABILITY METRICS INITIALIZATION ==========
 
     # Initialize FaultInjector if enabled
@@ -267,10 +290,44 @@ def run(input: dict[str, dict], **kwargs) -> dict[str, str]:
     original_completion = litellm.completion
     original_acompletion = litellm.acompletion
 
+    # Models where litellm routes through the Responses API instead of Chat Completions.
+    # These require tool definitions in flat format: {"type": "function", "name": ..., "parameters": ...}
+    # instead of Chat Completions nested format: {"type": "function", "function": {"name": ..., "parameters": ...}}
+    _RESPONSES_API_MODELS = {'gpt-5.4', 'gpt-5.4-pro'}
+
+    def _convert_tools_for_responses_api(tools):
+        """Convert Chat Completions tool format to Responses API format."""
+        if not tools:
+            return tools
+        converted = []
+        for tool in tools:
+            if tool.get('type') == 'function' and 'function' in tool:
+                # Flatten: lift function.name, function.description, function.parameters to top level
+                func = tool['function']
+                converted.append({
+                    'type': 'function',
+                    'name': func.get('name'),
+                    'description': func.get('description', ''),
+                    'parameters': func.get('parameters', {}),
+                })
+            else:
+                converted.append(tool)
+        return converted
+
     # Create a wrapper that adds reasoning parameters and OpenRouter configuration
     def completion_with_reasoning(*args, **completion_kwargs):
         # Check if this is a call with our agent's model
         if 'model' in completion_kwargs and completion_kwargs['model'] == model_name:
+            # Convert tool format for models that use the Responses API
+            if model_name in _RESPONSES_API_MODELS and 'tools' in completion_kwargs:
+                completion_kwargs['tools'] = _convert_tools_for_responses_api(completion_kwargs['tools'])
+
+            # For Responses API models, always set reasoning_effort to avoid litellm
+            # parse error: the API returns reasoning.effort="none" by default, which
+            # litellm's Pydantic model doesn't accept. Set "low" as a safe default.
+            if model_name in _RESPONSES_API_MODELS and 'reasoning_effort' not in kwargs:
+                completion_kwargs['reasoning_effort'] = 'low'
+
             # Add custom API base URL, API key, and headers for our agent's model
             if api_base:
                 completion_kwargs['api_base'] = api_base
@@ -336,6 +393,16 @@ def run(input: dict[str, dict], **kwargs) -> dict[str, str]:
     async def acompletion_with_reasoning(*args, **completion_kwargs):
         # Check if this is a call with our agent's model
         if 'model' in completion_kwargs and completion_kwargs['model'] == model_name:
+            # Convert tool format for models that use the Responses API
+            if model_name in _RESPONSES_API_MODELS and 'tools' in completion_kwargs:
+                completion_kwargs['tools'] = _convert_tools_for_responses_api(completion_kwargs['tools'])
+
+            # For Responses API models, always set reasoning_effort to avoid litellm
+            # parse error: the API returns reasoning.effort="none" by default, which
+            # litellm's Pydantic model doesn't accept. Set "low" as a safe default.
+            if model_name in _RESPONSES_API_MODELS and 'reasoning_effort' not in kwargs:
+                completion_kwargs['reasoning_effort'] = 'low'
+
             # Add custom API base URL, API key, and headers for our agent's model
             if api_base:
                 completion_kwargs['api_base'] = api_base
@@ -928,6 +995,13 @@ Respond with ONLY a number between 0 and 100. No explanation needed."""
                 'HTTP-Referer': 'https://github.com/benediktstroebl/hal-harness',
                 'X-Title': 'HAL Harness - Confidence Assessment'
             }
+
+        # Workaround: models routed through the Responses API (e.g. gpt-5.4) return
+        # reasoning.effort="none" by default, which litellm's Pydantic model rejects.
+        # Set "low" explicitly so the response parses correctly.
+        _responses_api_models = {'gpt-5.4', 'gpt-5.4-pro'}
+        if model_name in _responses_api_models:
+            kwargs_for_confidence['reasoning_effort'] = 'low'
 
         # Debug: Log what we're sending
         print(f"📊 Confidence assessment request for {model_name}:")

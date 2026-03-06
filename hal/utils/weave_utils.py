@@ -171,6 +171,11 @@ MODEL_PRICES_DICT = {
                 "openai/gpt-5.2": {"prompt_tokens": 1.75/1e6, "completion_tokens": 14/1e6},
                 "gpt-5.2-codex": {"prompt_tokens": 1.75/1e6, "completion_tokens": 14/1e6},
                 "openai/gpt-5.2-codex": {"prompt_tokens": 1.75/1e6, "completion_tokens": 14/1e6},
+                # GPT-5.4 (standard processing pricing)
+                "gpt-5.4": {"prompt_tokens": 2.50/1e6, "completion_tokens": 15/1e6},
+                "openai/gpt-5.4": {"prompt_tokens": 2.50/1e6, "completion_tokens": 15/1e6},
+                "gpt-5.4-pro": {"prompt_tokens": 30/1e6, "completion_tokens": 180/1e6},
+                "openai/gpt-5.4-pro": {"prompt_tokens": 30/1e6, "completion_tokens": 180/1e6},
 }
 
 CACHED_PRICE_OVERRIDES = {
@@ -204,6 +209,10 @@ CACHED_PRICE_OVERRIDES = {
     "openai/gpt-5.2": 0.18/1e6,
     "gpt-5.2-codex": 0.18/1e6,
     "openai/gpt-5.2-codex": 0.18/1e6,
+    "gpt-5.4": 0.25/1e6,
+    "openai/gpt-5.4": 0.25/1e6,
+    "gpt-5.4-pro": 0.25/1e6,  # No cached pricing listed; using conservative estimate
+    "openai/gpt-5.4-pro": 0.25/1e6,
     "o3-2025-04-16": 0.5/1e6,
     "openai/o3-2025-04-16": 0.5/1e6,
     # Gemini 3 & 2.5 cached pricing (90% discount)
@@ -226,7 +235,7 @@ def _normalize_usage(cost: Dict[str, Any]) -> Tuple[int, int, int, int]:
     if "prompt_tokens" in cost or "completion_tokens" in cost:
         # OpenAI-style
         prompt_tokens = cost.get("prompt_tokens", 0)
-        cached_input = cost.get("prompt_tokens_details", {}).get("cached_tokens", 0)
+        cached_input = (cost.get("prompt_tokens_details") or {}).get("cached_tokens", 0)
         cache_creation = 0  # OpenAI doesn't report cache writes separately
         
     elif "input_tokens" in cost or "output_tokens" in cost:
@@ -425,7 +434,9 @@ def get_total_cost(client):
                 progress.update(task, advance=1)
                 continue
 
-            for k, cost in usage_items:   
+            for k, cost in usage_items:
+                if cost is None or not isinstance(cost, dict):
+                    continue
                 if k not in token_usage:
                     token_usage[k] = {
                         "prompt_tokens": 0,
