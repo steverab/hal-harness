@@ -26,7 +26,7 @@ from reliability_eval.plots.helpers import (
 )
 
 # ── Static assets ─────────────────────────────────────────────────────
-_STATIC_DIR = Path(__file__).resolve().parent.parent / "website" / "static"
+_STATIC_DIR = Path(__file__).resolve().parent.parent / "assets"
 _HAL_LOGO_PNG = _STATIC_DIR / "logo.png"
 _PRINCETON_LOGO_PNG = _STATIC_DIR / "princeton-light.png"
 _HAL_LOGO_PDF = _STATIC_DIR / "logo.pdf"
