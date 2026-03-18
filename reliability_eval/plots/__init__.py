@@ -49,6 +49,7 @@ from reliability_eval.plots.social import (
     plot_social_gpt52_vs_gpt54_calibration as plot_social_gpt52_vs_gpt54_calibration,
     plot_social_gpt52_vs_gpt54_discrimination as plot_social_gpt52_vs_gpt54_discrimination,
     plot_social_gpt52_vs_gpt54_discrimination_2 as plot_social_gpt52_vs_gpt54_discrimination_2,
+    plot_social_discrimination_all_models as plot_social_discrimination_all_models,
     plot_social_overall_reliability as plot_social_overall_reliability,
     plot_social_openai_overall as plot_social_openai_overall,
     plot_social_openai_detailed as plot_social_openai_detailed,
@@ -56,6 +57,13 @@ from reliability_eval.plots.social import (
     plot_social_outcome_consistency as plot_social_outcome_consistency,
     plot_social_calibration as plot_social_calibration,
     plot_social_discrimination as plot_social_discrimination,
+    plot_social_consistency_vs_accuracy as plot_social_consistency_vs_accuracy,
+    plot_social_consistency_vs_accuracy_by_benchmark as plot_social_consistency_vs_accuracy_by_benchmark,
+    plot_social_date_and_reliability_vs_accuracy as plot_social_date_and_reliability_vs_accuracy,
+    plot_social_gaia_calibration_4panel as plot_social_gaia_calibration_4panel,
+    plot_social_gaia_levels as plot_social_gaia_levels,
+    plot_social_predictability_vs_accuracy as plot_social_predictability_vs_accuracy,
+    plot_social_predictability_vs_accuracy_by_benchmark as plot_social_predictability_vs_accuracy_by_benchmark,
 )
 from reliability_eval.plots.reports import (
     generate_full_latex_table as generate_full_latex_table,

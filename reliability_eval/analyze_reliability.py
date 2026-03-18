@@ -108,6 +108,7 @@ from reliability_eval.plots.social import (
     plot_social_gpt52_vs_gpt54_calibration,
     plot_social_gpt52_vs_gpt54_discrimination,
     plot_social_gpt52_vs_gpt54_discrimination_2,
+    plot_social_discrimination_all_models,
     plot_social_overall_reliability,
     plot_social_openai_overall,
     plot_social_openai_detailed,
@@ -115,6 +116,13 @@ from reliability_eval.plots.social import (
     plot_social_outcome_consistency,
     plot_social_calibration,
     plot_social_discrimination,
+    plot_social_consistency_vs_accuracy,
+    plot_social_consistency_vs_accuracy_by_benchmark,
+    plot_social_date_and_reliability_vs_accuracy,
+    plot_social_gaia_calibration_4panel,
+    plot_social_gaia_levels,
+    plot_social_predictability_vs_accuracy,
+    plot_social_predictability_vs_accuracy_by_benchmark,
 )
 
 warnings.filterwarnings("ignore")
@@ -354,6 +362,7 @@ def main():
             plot_level_consistency_patterns(df, all_metrics, output_dir)
             plot_action_efficiency_by_level(df, all_metrics, output_dir)
             plot_level_reliability_summary(df, all_metrics, output_dir)
+            plot_social_gaia_levels(df, all_metrics, Path(args.output_dir))
 
         print("\n📄 Generating report...")
         generate_report(df, output_dir)
@@ -451,10 +460,31 @@ def main():
             plot_social_gpt52_vs_gpt54_discrimination_2(
                 benchmark_data, combined_output_dir
             )
+            plot_social_discrimination_all_models(
+                benchmark_data, combined_output_dir
+            )
             plot_social_openai_consistency_tiles(benchmark_data, combined_output_dir)
             plot_social_outcome_consistency(benchmark_data, combined_output_dir)
             plot_social_calibration(benchmark_data, combined_output_dir)
             plot_social_discrimination(benchmark_data, combined_output_dir)
+            plot_social_date_and_reliability_vs_accuracy(
+                benchmark_data, combined_output_dir
+            )
+            plot_social_consistency_vs_accuracy(
+                benchmark_data, combined_output_dir
+            )
+            plot_social_consistency_vs_accuracy_by_benchmark(
+                benchmark_data, combined_output_dir
+            )
+            plot_social_predictability_vs_accuracy(
+                benchmark_data, combined_output_dir
+            )
+            plot_social_predictability_vs_accuracy_by_benchmark(
+                benchmark_data, combined_output_dir
+            )
+            plot_social_gaia_calibration_4panel(
+                benchmark_data, combined_output_dir
+            )
         else:
             print("  ⚠️  Not enough benchmark data for combined plot")
 

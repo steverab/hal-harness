@@ -1,6 +1,7 @@
 """Epoch AI-style charts for social media sharing."""
 
 import json
+import math
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 import matplotlib.gridspec as gridspec
@@ -10,6 +11,7 @@ import pandas as pd
 from pathlib import Path
 from typing import List, Tuple
 
+from reliability_eval.constants import PROVIDER_COLORS, PROVIDER_MARKERS
 from reliability_eval.loaders.agent_names import (
     get_model_metadata,
     sort_agents_by_provider_and_date,
@@ -27,6 +29,8 @@ from reliability_eval.plots.helpers import (
 _STATIC_DIR = Path(__file__).resolve().parent.parent / "website" / "static"
 _HAL_LOGO_PNG = _STATIC_DIR / "logo.png"
 _PRINCETON_LOGO_PNG = _STATIC_DIR / "princeton-light.png"
+_HAL_LOGO_PDF = _STATIC_DIR / "logo.pdf"
+_PRINCETON_LOGO_PDF = _STATIC_DIR / "princeton-light.pdf"
 
 # ── Style constants ───────────────────────────────────────────────────
 _FONT_FAMILY = ["DM Sans", "Helvetica", "DejaVu Sans"]
@@ -37,19 +41,91 @@ _BAR_HEIGHT = 0.6
 
 
 def _place_logo(fig, png_path: Path, rect: list, anchor: str = "W"):
-    """Place a pre-rasterised PNG logo on *fig* at *rect* [l, b, w, h].
+    """Reserve space for a logo on *fig* at *rect* [l, b, w, h].
+
+    Creates an invisible axes so that ``bbox_inches='tight'`` preserves the
+    area.  The actual vector logo is stamped later by
+    :func:`_stamp_vector_logos`.
 
     *anchor* controls alignment inside the rect when aspect-ratio
     doesn't match: 'W' = left-aligned, 'E' = right-aligned, 'C' = centred.
     """
-    if not png_path.exists():
-        return None
-    img = mpimg.imread(str(png_path))
     logo_ax = fig.add_axes(rect)
-    logo_ax.imshow(img)
     logo_ax.set_anchor(anchor)
     logo_ax.axis("off")
+    # Background-colored patch so bbox_inches="tight" accounts for this area
+    # (fully invisible patches are excluded from the tight bounding box).
+    logo_ax.add_patch(plt.Rectangle((0, 0), 1, 1, transform=logo_ax.transAxes,
+                                     facecolor=_BG_COLOR, edgecolor="none"))
     return logo_ax
+
+
+def _stamp_vector_logos(pdf_path: Path, fig, left_margin: float,
+                        right_edge: float, logo_y: float, logo_h: float,
+                        padding: float):
+    """Overlay vector logo PDFs onto *pdf_path* after matplotlib saves it.
+
+    Positions are derived from the figure-fraction coordinates used for the
+    placeholder axes (matching the rects passed to ``_place_logo``), then
+    converted to PDF points accounting for ``bbox_inches='tight'``.
+
+    The URL text (rendered by matplotlib) is vertically centred in the
+    footer; we centre each logo on the same y to keep alignment tight.
+    """
+    from pypdf import PdfReader, PdfWriter, Transformation
+
+    if not _HAL_LOGO_PDF.exists() or not _PRINCETON_LOGO_PDF.exists():
+        return
+
+    # -- coordinate mapping: figure-fraction → final-PDF points ----------
+    renderer = fig.canvas.get_renderer()
+    tight = fig.get_tightbbox(renderer)          # already in inches
+    fig_w = fig.get_figwidth()                   # inches
+    fig_h = fig.get_figheight()                  # inches
+    tx0 = tight.x0                               # tight-bbox origin (inches)
+    ty0 = tight.y0
+
+    def _to_pts(fx, fy):
+        return (fx * fig_w - tx0 + padding) * 72, \
+               (fy * fig_h - ty0 + padding) * 72
+
+    main = PdfReader(str(pdf_path))
+    page = main.pages[0]
+
+    # Vertical centre of the footer (where URL text sits) in PDF pts.
+    _, footer_centre_y = _to_pts(0, logo_y + logo_h / 2)
+
+    logo_rect_w = 0.25  # figure-fraction width reserved for each logo
+
+    for logo_pdf, lm, anchor in [
+        (_HAL_LOGO_PDF, left_margin, "W"),
+        (_PRINCETON_LOGO_PDF, right_edge - logo_rect_w, "E"),
+    ]:
+        logo = PdfReader(str(logo_pdf))
+        lpage = logo.pages[0]
+        lw_pts = float(lpage.mediabox.width)
+        lh_pts = float(lpage.mediabox.height)
+
+        # Scale to match the placeholder height.
+        target_h = logo_h * fig_h * 72
+        scale = target_h / lh_pts
+
+        # x from figure-fraction; y centred on footer_centre_y.
+        bx, _ = _to_pts(lm, 0)
+        by = footer_centre_y - (lh_pts * scale) / 2
+
+        if anchor == "E":
+            rect_w_pts = logo_rect_w * fig_w * 72
+            bx = bx + rect_w_pts - lw_pts * scale
+
+        page.merge_transformed_page(
+            lpage,
+            Transformation().scale(scale, scale).translate(bx, by),
+        )
+
+    writer = PdfWriter()
+    writer.add_page(page)
+    writer.write(str(pdf_path))
 
 
 def _prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
@@ -361,6 +437,7 @@ def plot_social_overall_reliability(
         bbox_inches="tight",
         pad_inches=padding,
     )
+    _stamp_vector_logos(output_path, fig, _LEFT_MARGIN, _RIGHT_EDGE, logo_y, logo_h, padding)
     print(f"  Saved: {output_path}")
     plt.close(fig)
 
@@ -538,6 +615,7 @@ def plot_social_openai_overall(
         bbox_inches="tight",
         pad_inches=padding,
     )
+    _stamp_vector_logos(output_path, fig, _LEFT_MARGIN, _RIGHT_EDGE, logo_y, logo_h, padding)
     print(f"  Saved: {output_path}")
     plt.close(fig)
 
@@ -884,6 +962,7 @@ def plot_social_openai_detailed(
         bbox_inches="tight",
         pad_inches=padding,
     )
+    _stamp_vector_logos(output_path, fig, _LEFT_MARGIN, _RIGHT_EDGE, logo_y, logo_h, padding)
     print(f"  Saved: {output_path}")
     plt.close(fig)
 
@@ -1224,6 +1303,7 @@ def _plot_social_52_54_curves(
         bbox_inches="tight",
         pad_inches=padding,
     )
+    _stamp_vector_logos(output_path, fig, _LEFT_MARGIN, _RIGHT_EDGE, logo_y, logo_h, padding)
     print(f"  Saved: {output_path}")
     plt.close(fig)
 
@@ -1364,15 +1444,20 @@ def _draw_density_panel(ax, label, data, color):
     )
     ax.tick_params(axis="both", length=0, pad=4)
     ax.set_facecolor(_BG_COLOR)
-    for spine in ax.spines.values():
-        spine.set_visible(False)
+    for name, spine in ax.spines.items():
+        if name in ("left", "bottom"):
+            spine.set_visible(True)
+            spine.set_linewidth(1.5)
+            spine.set_color(_COLOR_TEXT)
+        else:
+            spine.set_visible(False)
     ax.yaxis.set_visible(False)
     ax.legend(fontsize=8, loc="upper left", framealpha=0.8)
 
     if auroc is not None:
         ax.text(
             0.03,
-            0.72,
+            0.67,
             f"AUROC = {auroc:.2f}",
             transform=ax.transAxes,
             fontsize=9,
@@ -1553,11 +1638,104 @@ def plot_social_gpt52_vs_gpt54_discrimination_2(
         bbox_inches="tight",
         pad_inches=padding,
     )
+    _stamp_vector_logos(output_path, fig, _LEFT_MARGIN, _RIGHT_EDGE, logo_y, logo_h, padding)
     print(f"  Saved: {output_path}")
     plt.close(fig)
 
     for k, v in prev_rc.items():
         plt.rcParams[k] = v
+
+
+def plot_social_discrimination_all_models(
+    benchmark_data: List[Tuple[str, pd.DataFrame]],
+    output_dir: Path,
+    *,
+    padding: float = 0.5,
+    grid_cols: int = 4,
+):
+    """Correct vs incorrect confidence density plots for ALL models.
+
+    One PDF per benchmark.  Models arranged in a grid (rows x *grid_cols*),
+    each cell is a KDE density panel.
+
+    Output: social/discrimination_all_{bm_name}.pdf
+    """
+    if not benchmark_data:
+        print("  No benchmark data for all-model discrimination density plot")
+        return
+
+    prev_rc = _social_font_setup()
+
+    for bm_name, bm_df in benchmark_data:
+        df_prep = _prepare_dataframe(bm_df)
+
+        # Collect panels for models that have density data
+        panels = []  # [(label, densities, color)]
+        for _, row in df_prep.iterrows():
+            densities = _parse_confidence_densities(row)
+            if densities is None:
+                continue
+            label = strip_agent_prefix(row["agent"])
+            provider = row.get("provider", "Unknown")
+            color = PROVIDER_COLORS.get(provider, "#999999")
+            panels.append((label, densities, color))
+
+        if not panels:
+            print(f"  No density data for {bm_name}")
+            continue
+
+        n_panels = len(panels)
+        n_cols = min(grid_cols, n_panels)
+        n_rows = math.ceil(n_panels / n_cols)
+
+        _LM = 0.03
+        header_h, footer_h, row_h = 0.9, 0.5, 2.6
+        panel_w = 2.6
+        fig_w = n_cols * panel_w + 1.0
+        fig_h = header_h + n_rows * row_h + footer_h
+
+        bm_display = _BM_DISPLAY.get(bm_name, bm_name)
+        fig = plt.figure(figsize=(fig_w, fig_h), facecolor=_BG_COLOR)
+        outer_gs = gridspec.GridSpec(
+            3, 1, figure=fig,
+            height_ratios=[header_h, n_rows * row_h, footer_h],
+            hspace=0.25, left=0.06, right=0.97, top=0.98, bottom=0.02,
+        )
+        _add_social_header(
+            fig, outer_gs[0],
+            f"Score distributions — {bm_display}",
+            "Confidence densities for correct vs incorrect predictions "
+            "across all models.",
+            left_margin=_LM,
+        )
+
+        body_gs = outer_gs[1].subgridspec(n_rows, n_cols, wspace=0.20, hspace=0.55)
+        for idx, (label, data, color) in enumerate(panels):
+            r, c = divmod(idx, n_cols)
+            ax = fig.add_subplot(body_gs[r, c])
+            _draw_density_panel(ax, label, data, color)
+            ax.set_title(
+                label, fontsize=10, fontweight="bold",
+                color=_COLOR_TEXT, pad=8,
+            )
+            ax.set_xlabel("Confidence", fontsize=9, color=_COLOR_TEXT)
+
+        # Hide leftover empty cells
+        for idx in range(n_panels, n_rows * n_cols):
+            r, c = divmod(idx, n_cols)
+            ax = fig.add_subplot(body_gs[r, c])
+            ax.axis("off")
+
+        _add_social_footer_and_save(
+            fig, outer_gs[-1], output_dir,
+            f"discrimination_all_{bm_name}.pdf",
+            left_margin=_LM, padding=padding, prev_rc=None,
+        )
+
+    # Restore fonts once after all benchmarks
+    if prev_rc:
+        for k, v in prev_rc.items():
+            plt.rcParams[k] = v
 
 
 # ── Consistency tile heatmap ──────────────────────────────────────────
@@ -1917,6 +2095,7 @@ def plot_social_openai_consistency_tiles(
         bbox_inches="tight",
         pad_inches=padding,
     )
+    _stamp_vector_logos(output_path, fig, _LEFT_MARGIN, _RIGHT_EDGE, logo_y, logo_h, padding)
     print(f"  Saved: {output_path}")
     plt.close(fig)
 
@@ -2094,6 +2273,7 @@ def _plot_social_openai_metric(
         bbox_inches="tight",
         pad_inches=padding,
     )
+    _stamp_vector_logos(output_path, fig, _LEFT_MARGIN, _RIGHT_EDGE, logo_y, logo_h, padding)
     print(f"  Saved: {output_path}")
     plt.close(fig)
 
@@ -2164,4 +2344,853 @@ def plot_social_discrimination(
         subtitle="How well confidence separates correct from incorrect (AUROC).",
         filename="openai_discrimination.pdf",
         padding=padding,
+    )
+
+
+# ── Cross-provider scatter plot infrastructure ───────────────────────
+
+_HIGHLIGHT_SUFFIXES = [
+    ("gpt_5_4_medium", "GPT 5.4 (medium)"),
+    ("gpt_4_turbo", "GPT-4 Turbo"),
+    ("claude_haiku_3_5", "Claude 3.5 Haiku"),
+    ("claude_opus_4_5", "Claude 4.5 Opus"),
+]
+
+
+def _social_font_setup():
+    """Set social plot fonts; return dict to restore later."""
+    prev_rc = {k: plt.rcParams[k] for k in ("font.family", "font.sans-serif")}
+    plt.rcParams["font.family"] = "sans-serif"
+    plt.rcParams["font.sans-serif"] = _FONT_FAMILY
+    return prev_rc
+
+
+def _add_social_header(fig, gs_slot, title, subtitle, left_margin=0.05):
+    """Draw header with title and subtitle into a gridspec slot."""
+    ax = fig.add_subplot(gs_slot)
+    ax.axis("off")
+    hbox = ax.get_position()
+    fig.text(
+        left_margin, hbox.y1 - 0.01, title,
+        fontsize=19, fontweight="bold", color=_COLOR_TEXT, va="top", ha="left",
+    )
+    fig.text(
+        left_margin, hbox.y0 + hbox.height * 0.40, subtitle,
+        fontsize=12, color=_COLOR_SUBTLE, va="top", ha="left", wrap=True,
+    )
+    # Invisible anchor at the bottom of the header box so that
+    # bbox_inches="tight" does not collapse the header–body gap.
+    fig.text(left_margin, hbox.y0, " ", fontsize=1, alpha=0)
+
+
+def _add_social_footer_and_save(
+    fig, gs_slot, output_dir, filename, *,
+    left_margin=0.05, right_edge=0.97, padding=0.5, prev_rc=None,
+):
+    """Add logo footer, save to social/ subdir, close fig, restore fonts."""
+    footer_ax = fig.add_subplot(gs_slot)
+    footer_ax.axis("off")
+    footer_ax.set_facecolor(_BG_COLOR)
+    fig.canvas.draw()
+    fbox = footer_ax.get_position()
+    logo_h = fbox.height * 0.8
+    logo_y = fbox.y0 + fbox.height * 0.1
+    _place_logo(fig, _HAL_LOGO_PNG, [left_margin, logo_y, 0.25, logo_h], anchor="W")
+    _place_logo(
+        fig, _PRINCETON_LOGO_PNG,
+        [right_edge - 0.25, logo_y, 0.25, logo_h], anchor="E",
+    )
+    fig.text(
+        (left_margin + right_edge) / 2, fbox.y0 + fbox.height * 0.5,
+        "hal.cs.princeton.edu/reliability",
+        fontsize=10, color=_COLOR_SUBTLE, ha="center", va="center",
+    )
+    social_dir = output_dir / "social"
+    social_dir.mkdir(parents=True, exist_ok=True)
+    path = social_dir / filename
+    fig.savefig(
+        path, dpi=300, format="pdf", facecolor=_BG_COLOR,
+        bbox_inches="tight", pad_inches=padding,
+    )
+    _stamp_vector_logos(path, fig, left_margin, right_edge, logo_y, logo_h,
+                        padding)
+    print(f"  Saved: {path}")
+    plt.close(fig)
+    if prev_rc:
+        for k, v in prev_rc.items():
+            plt.rcParams[k] = v
+
+
+def _style_social_scatter(
+    ax, xlabel="", ylabel="",
+    emphasized_y_spine=False, emphasized_spines=False,
+):
+    """Apply social styling to scatter axes.
+
+    *emphasized_y_spine*: keep only the left spine (horizontal bar charts).
+    *emphasized_spines*: keep both left and bottom spines (scatter / density).
+    """
+    ax.set_facecolor(_BG_COLOR)
+    ax.set_axisbelow(True)
+    ax.xaxis.grid(True, color="#a0a0a0", linewidth=0.5)
+    ax.yaxis.grid(True, color="#a0a0a0", linewidth=0.5)
+    _emph = set()
+    if emphasized_spines:
+        _emph = {"left", "bottom"}
+    elif emphasized_y_spine:
+        _emph = {"left"}
+    for name, spine in ax.spines.items():
+        if name in _emph:
+            spine.set_visible(True)
+            spine.set_linewidth(1.5)
+            spine.set_color(_COLOR_TEXT)
+        else:
+            spine.set_visible(False)
+    if xlabel:
+        ax.set_xlabel(xlabel, fontsize=10, color=_COLOR_TEXT)
+    if ylabel:
+        ax.set_ylabel(ylabel, fontsize=10, color=_COLOR_TEXT)
+    ax.tick_params(
+        axis="both", length=0, pad=4, labelsize=9, labelcolor=_COLOR_SUBTLE,
+    )
+
+
+def _aggregate_across_benchmarks(benchmark_data):
+    """Average model metrics across benchmarks by display name."""
+    records = []
+    for _bm_name, bm_df in benchmark_data:
+        df_prep = _prepare_dataframe(bm_df)
+        for _, row in df_prep.iterrows():
+            records.append({
+                "display_name": strip_agent_prefix(row["agent"]),
+                "agent": row["agent"],
+                "accuracy": row.get("accuracy", np.nan),
+                "reliability_overall": row.get("reliability_overall", np.nan),
+                "reliability_consistency": row.get(
+                    "reliability_consistency", np.nan
+                ),
+                "reliability_predictability": row.get(
+                    "reliability_predictability", np.nan
+                ),
+                "release_timestamp": row.get("release_timestamp"),
+                "provider": row.get("provider", "Unknown"),
+            })
+    if not records:
+        return pd.DataFrame()
+    df = pd.DataFrame(records)
+    return df.groupby("display_name").agg({
+        "accuracy": "mean",
+        "reliability_overall": "mean",
+        "reliability_consistency": "mean",
+        "reliability_predictability": "mean",
+        "release_timestamp": "first",
+        "provider": "first",
+        "agent": "first",
+    }).reset_index()
+
+
+def _place_annotations(ax, annotations, overrides=None):
+    """Place bold, provider-colored annotations with overlap avoidance.
+
+    *annotations*: list of ``(x, y, text, color)``.
+    *overrides*: optional dict mapping display-name substring to a fixed
+    y-offset in points (positive = above, negative = below).
+    """
+    if not annotations:
+        return
+    overrides = overrides or {}
+    _bbox = dict(boxstyle="round,pad=0.15", facecolor="white", alpha=0.7,
+                 edgecolor="none")
+    # Candidate y-offsets (x-offset always 0 to centre on dot's x)
+    _Y_OFFSETS = [10, -12, 18, -20, 26, -28]
+    placed: list[tuple] = []  # (x, y, oy)
+    for x, y, text, color in annotations:
+        # Check for a manual override first
+        manual = None
+        for key, offset in overrides.items():
+            if key in text:
+                manual = offset
+                break
+        if manual is not None:
+            chosen_oy = manual
+        else:
+            chosen_oy = _Y_OFFSETS[0]
+            for oy in _Y_OFFSETS:
+                ok = True
+                for px, py, poy in placed:
+                    if abs(x - px) < 0.1 and abs(y - py) < 0.06:
+                        if abs(oy - poy) < 16:
+                            ok = False
+                            break
+                if ok:
+                    chosen_oy = oy
+                    break
+        txt = ax.annotate(
+            text, (x, y),
+            textcoords="offset points", xytext=(0, chosen_oy),
+            fontsize=8, color=color, ha="center", va="center",
+            zorder=5, bbox=_bbox,
+        )
+        # DM Sans / Helvetica have no bold .ttf on this system;
+        # DejaVu Sans ships DejaVuSans-Bold.ttf with matplotlib.
+        txt.set_fontfamily("DejaVu Sans")
+        txt.set_fontweight("bold")
+        placed.append((x, y, chosen_oy))
+
+
+def _draw_provider_scatter(
+    ax, df, x_col, y_col, *,
+    highlight=True, add_trend=True, show_legend=True,
+    highlight_suffixes=None, annotation_overrides=None,
+):
+    """Draw provider-colored scatter, optionally highlighting specific models."""
+    from matplotlib.lines import Line2D
+
+    suffixes = highlight_suffixes if highlight_suffixes is not None else _HIGHLIGHT_SUFFIXES
+    annotations: list[tuple] = []
+
+    for provider in ["OpenAI", "Google", "Anthropic"]:
+        mask = df["provider"] == provider
+        if mask.sum() == 0:
+            continue
+        sub = df[mask]
+        color = PROVIDER_COLORS.get(provider, "#999999")
+        marker = PROVIDER_MARKERS.get(provider, "o")
+
+        if highlight:
+            hl_mask = sub["agent"].apply(
+                lambda a: any(a.endswith(s) for s, _ in suffixes)
+            )
+            bg = sub[~hl_mask]
+            fg = sub[hl_mask]
+            if len(bg) > 0:
+                ax.scatter(
+                    bg[x_col], bg[y_col], c=color, marker=marker,
+                    s=40, alpha=0.45, edgecolors="black", linewidth=0.4, zorder=2,
+                )
+            if len(fg) > 0:
+                ax.scatter(
+                    fg[x_col], fg[y_col], c=color, marker=marker,
+                    s=100, alpha=0.9, edgecolors="black", linewidth=0.8, zorder=4,
+                )
+                for _, row in fg.iterrows():
+                    annotations.append((
+                        row[x_col], row[y_col],
+                        strip_agent_prefix(row["agent"]),
+                        color,
+                    ))
+        else:
+            ax.scatter(
+                sub[x_col], sub[y_col], c=color, marker=marker,
+                s=60, alpha=0.85, edgecolors="black", linewidth=0.6, zorder=3,
+            )
+
+    _place_annotations(ax, annotations, overrides=annotation_overrides)
+
+    if add_trend:
+        from scipy import stats as sp_stats
+
+        valid = df[x_col].notna() & df[y_col].notna()
+        if valid.sum() >= 3:
+            x_vals = df.loc[valid, x_col].values.astype(float)
+            y_vals = df.loc[valid, y_col].values.astype(float)
+            slope, intercept, r_value, _, _ = sp_stats.linregress(x_vals, y_vals)
+            x_range = np.linspace(x_vals.min(), x_vals.max(), 100)
+            ax.plot(
+                x_range, slope * x_range + intercept, "--",
+                color="#333333", linewidth=1.5, alpha=0.7, zorder=1,
+            )
+            ax.annotate(
+                f"slope = {slope:+.2f}  r = {r_value:+.2f}",
+                xy=(0.03, 0.05),
+                xycoords="axes fraction", fontsize=9, fontweight="bold",
+                ha="left", va="bottom", color=_COLOR_TEXT,
+            )
+
+    if show_legend:
+        handles = []
+        for prov in ["OpenAI", "Google", "Anthropic"]:
+            if (df["provider"] == prov).sum() > 0:
+                handles.append(Line2D(
+                    [0], [0], marker=PROVIDER_MARKERS.get(prov, "o"),
+                    color="w", markerfacecolor=PROVIDER_COLORS.get(prov, "#999"),
+                    markersize=8, markeredgecolor="black", markeredgewidth=0.5,
+                    label=prov,
+                ))
+        if handles:
+            ax.legend(handles=handles, fontsize=9, loc="lower right", framealpha=0.8)
+
+
+# ── 1. Release Date vs Accuracy & Reliability vs Accuracy ────────────
+
+
+def plot_social_date_and_reliability_vs_accuracy(
+    benchmark_data: List[Tuple[str, pd.DataFrame]],
+    output_dir: Path,
+    *,
+    padding: float = 0.5,
+):
+    """Side-by-side scatter: release date vs accuracy and reliability vs accuracy.
+
+    Aggregated across benchmarks. All models colored by provider.
+
+    Output: social/date_reliability_vs_accuracy.pdf
+    """
+    if not benchmark_data:
+        print("  No benchmark data for date/reliability vs accuracy plot")
+        return
+
+    import matplotlib.dates as mdates
+    from scipy import stats as sp_stats
+    from matplotlib.lines import Line2D
+
+    agg = _aggregate_across_benchmarks(benchmark_data)
+    if agg.empty:
+        return
+
+    prev_rc = _social_font_setup()
+    _LM = 0.03
+    header_h, spacer_h, footer_h, body_h = 0.8, 0.6, 0.6, 4.0
+    fig = plt.figure(
+        figsize=(9, header_h + body_h + spacer_h + footer_h + 0.2),
+        facecolor=_BG_COLOR,
+    )
+    gs = gridspec.GridSpec(
+        4, 1, figure=fig,
+        height_ratios=[header_h, body_h, spacer_h, footer_h],
+        hspace=0.05, left=0.10, right=0.97, top=0.97, bottom=0.02,
+    )
+    _add_social_header(
+        fig, gs[0],
+        "Reliability gains lag capability improvements",
+        "Release date vs accuracy (left) and accuracy vs overall "
+        "reliability (right), averaged across benchmarks.",
+        left_margin=_LM,
+    )
+
+    inner = gs[1].subgridspec(1, 2, wspace=0.25)
+    # Invisible spacer row to absorb rotated date tick labels
+    spacer_ax = fig.add_subplot(gs[2])
+    spacer_ax.axis("off")
+    spacer_ax.set_facecolor(_BG_COLOR)
+
+    # Left: release date vs accuracy
+    ax_l = fig.add_subplot(inner[0, 0])
+    for prov in ["OpenAI", "Google", "Anthropic"]:
+        m = agg["provider"] == prov
+        if m.sum() == 0:
+            continue
+        ax_l.scatter(
+            agg.loc[m, "release_timestamp"], agg.loc[m, "accuracy"],
+            c=PROVIDER_COLORS.get(prov, "#999"),
+            marker=PROVIDER_MARKERS.get(prov, "o"),
+            s=60, alpha=0.85, edgecolors="black", linewidth=0.6,
+            zorder=3, label=prov,
+        )
+    valid = agg["release_timestamp"].notna() & agg["accuracy"].notna()
+    if valid.sum() >= 3:
+        xd = agg.loc[valid, "release_timestamp"]
+        xn = (xd - xd.min()).dt.days.values
+        yv = agg.loc[valid, "accuracy"].values
+        # Regress in years so the slope is human-readable
+        xn_yr = xn / 365.25
+        sl, ic, rv, _, _ = sp_stats.linregress(xn_yr, yv)
+        xr = np.array([xn.min(), xn.max()])
+        xr_yr = xr / 365.25
+        ax_l.plot(
+            [xd.min() + pd.Timedelta(days=d) for d in xr],
+            sl * xr_yr + ic, "--", color="#333", linewidth=1.5, alpha=0.7, zorder=1,
+        )
+        ax_l.annotate(
+            f"slope = {sl:+.2f}/yr  r = {rv:+.2f}",
+            xy=(0.03, 0.05), xycoords="axes fraction",
+            fontsize=9, fontweight="bold", ha="left", va="bottom",
+            color=_COLOR_TEXT,
+        )
+    ax_l.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
+    ax_l.xaxis.set_major_locator(mdates.MonthLocator(interval=4))
+    plt.setp(ax_l.xaxis.get_majorticklabels(), rotation=30, ha="right")
+    ax_l.set_ylim(0, 1.05)
+    _style_social_scatter(ax_l, xlabel="Release Date", ylabel="Accuracy",
+                          emphasized_spines=True)
+    ax_l.legend(fontsize=9, loc="upper left", framealpha=0.8)
+
+    # Right: accuracy vs reliability (no legend — left panel already has one)
+    ax_r = fig.add_subplot(inner[0, 1])
+    _draw_provider_scatter(
+        ax_r, agg, "accuracy", "reliability_overall",
+        highlight=False, show_legend=False,
+    )
+    ax_r.set_xlim(0, 1.05)
+    ax_r.set_ylim(0, 1.05)
+    _style_social_scatter(ax_r, xlabel="Accuracy", ylabel="Overall Reliability",
+                          emphasized_spines=True)
+
+    _add_social_footer_and_save(
+        fig, gs[-1], output_dir, "date_reliability_vs_accuracy.pdf",
+        left_margin=_LM, padding=padding, prev_rc=prev_rc,
+    )
+
+
+# ── 2 & 3. Metric vs Accuracy (aggregated + per-benchmark) ──────────
+
+
+def _plot_social_metric_vs_accuracy(
+    benchmark_data: List[Tuple[str, pd.DataFrame]],
+    output_dir: Path,
+    *,
+    y_col: str,
+    y_label: str,
+    title: str,
+    subtitle: str,
+    filename: str,
+    per_benchmark: bool = False,
+    padding: float = 0.5,
+    annotation_overrides=None,
+):
+    """Shared scatter of a reliability metric vs accuracy."""
+    if not benchmark_data:
+        print(f"  No benchmark data for {filename}")
+        return
+
+    _display = {
+        "taubench_airline": r"$\tau$-bench",
+        "taubench_airline_original": r"$\tau$-bench (original)",
+        "gaia": "GAIA",
+    }
+
+    prev_rc = _social_font_setup()
+    _LM = 0.03
+
+    if per_benchmark:
+        filtered = [
+            (bm, df) for bm, df in benchmark_data
+            if bm != "taubench_airline_original"
+        ]
+        if not filtered:
+            for k, v in prev_rc.items():
+                plt.rcParams[k] = v
+            return
+
+        n_panels = len(filtered)
+        header_h, spacer_h, footer_h, panel_h = 0.8, 0.5, 0.6, 3.5
+        body_h = n_panels * panel_h + (n_panels - 1) * 0.4  # panels + gaps
+        fig_h = header_h + body_h + spacer_h + footer_h + 0.2
+        fig = plt.figure(figsize=(7, fig_h), facecolor=_BG_COLOR)
+        gs = gridspec.GridSpec(
+            4, 1, figure=fig,
+            height_ratios=[header_h, body_h, spacer_h, footer_h],
+            hspace=0.05, left=0.12, right=0.95, top=0.97, bottom=0.02,
+        )
+        _add_social_header(fig, gs[0], title, subtitle, left_margin=_LM)
+        inner = gs[1].subgridspec(n_panels, 1, hspace=0.20)
+
+        _TAUBENCH_HIGHLIGHTS = _HIGHLIGHT_SUFFIXES + [
+            ("gpt_5_4_xhigh", "GPT 5.4 (xhigh)"),
+        ]
+        for i, (bm_name, bm_df) in enumerate(filtered):
+            ax = fig.add_subplot(inner[i])
+            df_prep = _prepare_dataframe(bm_df)
+            hl = _TAUBENCH_HIGHLIGHTS if "taubench" in bm_name else None
+            _draw_provider_scatter(
+                ax, df_prep, "accuracy", y_col, highlight_suffixes=hl,
+                annotation_overrides=annotation_overrides,
+            )
+            ax.set_xlim(0, 1.05)
+            ax.set_ylim(0, 1.05)
+            show_x = i == n_panels - 1
+            _style_social_scatter(
+                ax,
+                xlabel="Accuracy" if show_x else "",
+                ylabel=y_label,
+                emphasized_spines=True,
+            )
+            if not show_x:
+                ax.set_xticklabels([])
+            ax_bbox = ax.get_position()
+            fig.text(
+                0.01, ax_bbox.y0 + ax_bbox.height / 2,
+                _display.get(bm_name, bm_name),
+                fontsize=14, fontweight="bold", color=_COLOR_TEXT,
+                va="center", ha="center", rotation=90,
+            )
+
+        # Invisible spacer to separate body from footer
+        spacer_ax = fig.add_subplot(gs[-2])
+        spacer_ax.axis("off")
+        spacer_ax.set_facecolor(_BG_COLOR)
+
+        _add_social_footer_and_save(
+            fig, gs[-1], output_dir, filename,
+            left_margin=_LM, padding=padding, prev_rc=prev_rc,
+        )
+    else:
+        agg = _aggregate_across_benchmarks(benchmark_data)
+        if agg.empty:
+            for k, v in prev_rc.items():
+                plt.rcParams[k] = v
+            return
+
+        header_h, spacer_h, footer_h, body_h = 0.8, 0.5, 0.6, 5.0
+        fig = plt.figure(
+            figsize=(7, header_h + body_h + spacer_h + footer_h + 0.2),
+            facecolor=_BG_COLOR,
+        )
+        gs = gridspec.GridSpec(
+            4, 1, figure=fig,
+            height_ratios=[header_h, body_h, spacer_h, footer_h],
+            hspace=0.05, left=0.12, right=0.95, top=0.97, bottom=0.02,
+        )
+        _add_social_header(fig, gs[0], title, subtitle, left_margin=_LM)
+
+        ax = fig.add_subplot(gs[1])
+        _draw_provider_scatter(ax, agg, "accuracy", y_col,
+                               annotation_overrides=annotation_overrides)
+        ax.set_xlim(0, 1.05)
+        ax.set_ylim(0, 1.05)
+        _style_social_scatter(ax, xlabel="Accuracy", ylabel=y_label,
+                              emphasized_spines=True)
+
+        # Invisible spacer to separate body from footer
+        spacer_ax = fig.add_subplot(gs[2])
+        spacer_ax.axis("off")
+        spacer_ax.set_facecolor(_BG_COLOR)
+
+        _add_social_footer_and_save(
+            fig, gs[-1], output_dir, filename,
+            left_margin=_LM, padding=padding, prev_rc=prev_rc,
+        )
+
+
+def plot_social_consistency_vs_accuracy(
+    benchmark_data: List[Tuple[str, pd.DataFrame]],
+    output_dir: Path,
+    *,
+    padding: float = 0.5,
+):
+    """Consistency vs accuracy scatter, aggregated across benchmarks.
+
+    Highlights GPT 5.4 (medium), GPT-4 Turbo, Claude 3.5 Haiku, Claude 4.5 Opus.
+
+    Output: social/consistency_vs_accuracy.pdf
+    """
+    _plot_social_metric_vs_accuracy(
+        benchmark_data, output_dir,
+        y_col="reliability_consistency",
+        y_label="Consistency",
+        title="Consistency does not track accuracy",
+        subtitle="Consistency vs accuracy, averaged across benchmarks. "
+                 "Highlighted: GPT 5.4 (medium), GPT-4 Turbo, "
+                 "Claude 3.5 Haiku, Claude 4.5 Opus.",
+        filename="consistency_vs_accuracy.pdf",
+        padding=padding,
+        annotation_overrides={"5.4 (medium)": -14},
+    )
+
+
+def plot_social_consistency_vs_accuracy_by_benchmark(
+    benchmark_data: List[Tuple[str, pd.DataFrame]],
+    output_dir: Path,
+    *,
+    padding: float = 0.5,
+):
+    """Consistency vs accuracy scatter, per benchmark.
+
+    Output: social/consistency_vs_accuracy_by_benchmark.pdf
+    """
+    _plot_social_metric_vs_accuracy(
+        benchmark_data, output_dir,
+        y_col="reliability_consistency",
+        y_label="Consistency",
+        title="Consistency does not track accuracy",
+        subtitle="Consistency vs accuracy, shown independently per benchmark.",
+        filename="consistency_vs_accuracy_by_benchmark.pdf",
+        per_benchmark=True,
+        padding=padding,
+        annotation_overrides={"4.5 Opus": 22, "5.4 (medium)": -22},
+    )
+
+
+def plot_social_predictability_vs_accuracy(
+    benchmark_data: List[Tuple[str, pd.DataFrame]],
+    output_dir: Path,
+    *,
+    padding: float = 0.5,
+):
+    """Predictability vs accuracy scatter, aggregated across benchmarks.
+
+    Output: social/predictability_vs_accuracy.pdf
+    """
+    _plot_social_metric_vs_accuracy(
+        benchmark_data, output_dir,
+        y_col="reliability_predictability",
+        y_label="Predictability",
+        title="Predictability has improved with accuracy",
+        subtitle="Predictability vs accuracy, averaged across benchmarks.",
+        filename="predictability_vs_accuracy.pdf",
+        padding=padding,
+        annotation_overrides={"4.5 Opus": 14, "5.4 (medium)": -14},
+    )
+
+
+def plot_social_predictability_vs_accuracy_by_benchmark(
+    benchmark_data: List[Tuple[str, pd.DataFrame]],
+    output_dir: Path,
+    *,
+    padding: float = 0.5,
+):
+    """Predictability vs accuracy scatter, per benchmark.
+
+    Output: social/predictability_vs_accuracy_by_benchmark.pdf
+    """
+    _plot_social_metric_vs_accuracy(
+        benchmark_data, output_dir,
+        y_col="reliability_predictability",
+        y_label="Predictability",
+        title="Predictability has improved with accuracy",
+        subtitle="Predictability vs accuracy, shown independently per benchmark.",
+        filename="predictability_vs_accuracy_by_benchmark.pdf",
+        per_benchmark=True,
+        padding=padding,
+        annotation_overrides={"4.5 Opus": 14, "5.4 (medium)": -14},
+    )
+
+
+# ── 4. GAIA 4-panel calibration ──────────────────────────────────────
+
+
+def plot_social_gaia_calibration_4panel(
+    benchmark_data: List[Tuple[str, pd.DataFrame]],
+    output_dir: Path,
+    *,
+    padding: float = 0.5,
+):
+    """Four-panel calibration diagram for GAIA: one per highlighted model.
+
+    Models: GPT 5.4 (medium), GPT-4 Turbo, Claude 3.5 Haiku, Claude 4.5 Opus.
+
+    Output: social/gaia_calibration_4panel.pdf
+    """
+    gaia_df = None
+    for bm_name, bm_df in benchmark_data:
+        if bm_name == "gaia":
+            gaia_df = bm_df
+            break
+    if gaia_df is None:
+        print("  No GAIA data for 4-panel calibration plot")
+        return
+
+    df_prep = _prepare_dataframe(gaia_df)
+
+    # Order: GPT-4 Turbo, GPT 5.4 (medium), Claude 3.5 Haiku, Claude 4.5 Opus
+    _CALIB_ORDER = [
+        ("gpt_4_turbo", "GPT-4 Turbo"),
+        ("gpt_5_4_medium", "GPT 5.4 (medium)"),
+        ("claude_haiku_3_5", "Claude 3.5 Haiku"),
+        ("claude_opus_4_5", "Claude 4.5 Opus"),
+    ]
+    # Legend positions per panel index — nudged to avoid axis overlap
+    # Left column: upper left but shifted right; right column: shifted up
+    _LEGEND_BBOX = {
+        0: {"loc": "upper left", "bbox_to_anchor": (0.05, 0.98)},
+        1: {"loc": "lower right", "bbox_to_anchor": (0.98, 0.06)},
+        2: {"loc": "upper left", "bbox_to_anchor": (0.05, 0.98)},
+        3: {"loc": "lower right", "bbox_to_anchor": (0.98, 0.06)},
+    }
+
+    model_panels = []
+    for suffix, label in _CALIB_ORDER:
+        row = _get_model_row(df_prep, suffix)
+        if row is None:
+            continue
+        bins = _parse_calibration_bins(row)
+        if not bins:
+            continue
+        provider = row.get("provider", "Unknown")
+        color = PROVIDER_COLORS.get(provider, "#999999")
+        model_panels.append((label, bins, color))
+
+    if not model_panels:
+        print("  No calibration data for highlighted models on GAIA")
+        return
+
+    prev_rc = _social_font_setup()
+    _LM = 0.03
+    header_h, footer_h = 0.8, 0.6
+    panel_w = 3.8
+    panel_h = panel_w + 0.3
+    n_rows = (len(model_panels) + 1) // 2
+    body_h = n_rows * panel_h
+    fig_w = 2 * panel_w + 2.0
+    fig_h = header_h + body_h + footer_h + 0.3
+
+    fig = plt.figure(figsize=(fig_w, fig_h), facecolor=_BG_COLOR)
+    gs = gridspec.GridSpec(
+        n_rows + 2, 1, figure=fig,
+        height_ratios=[header_h] + [panel_h] * n_rows + [footer_h],
+        hspace=0.30, left=0.10, right=0.95, top=0.97, bottom=0.02,
+    )
+    _add_social_header(
+        fig, gs[0],
+        "Calibration across providers on GAIA",
+        "Confidence vs accuracy calibration curves. "
+        "Points sized by bin count. Dashed line = perfect calibration.",
+        left_margin=_LM,
+    )
+
+    inner_gs = None
+    for i, (label, bins, color) in enumerate(model_panels):
+        row_idx = i // 2
+        col_idx = i % 2
+        if col_idx == 0:
+            inner_gs = gs[1 + row_idx].subgridspec(1, 2, wspace=0.30)
+        ax = fig.add_subplot(inner_gs[0, col_idx])
+        _draw_calibration_panel(ax, [(label, bins, color)])
+        _style_curve_axes(
+            ax, xlabel="Confidence",
+            ylabel="Accuracy" if col_idx == 0 else None,
+        )
+        # Widen limits so circles aren't clipped
+        ax.set_xlim(-0.05, 1.05)
+        ax.set_ylim(-0.05, 1.05)
+        ax.set_title(
+            label, fontsize=12, fontweight="bold", color=_COLOR_TEXT, pad=8,
+        )
+        # Override legend position per panel
+        handles, labels = ax.get_legend_handles_labels()
+        lkw = _LEGEND_BBOX.get(i, {"loc": "lower right"})
+        ax.legend(handles, labels, fontsize=9, framealpha=0.8, **lkw)
+
+    _add_social_footer_and_save(
+        fig, gs[-1], output_dir, "gaia_calibration_4panel.pdf",
+        left_margin=_LM, padding=padding, prev_rc=prev_rc,
+    )
+
+
+# ── 5. GAIA levels: accuracy & mean actions by difficulty ─────────────
+
+
+def plot_social_gaia_levels(
+    df: pd.DataFrame,
+    all_metrics,
+    output_dir: Path,
+    *,
+    padding: float = 0.5,
+):
+    """Side-by-side accuracy and mean actions on GAIA by difficulty level.
+
+    Horizontal bar chart with shared model y-axis, grouped by GAIA difficulty.
+    Requires *all_metrics* (list of ReliabilityMetrics) for per-level data.
+
+    Output: social/gaia_levels.pdf
+    """
+    if all_metrics is None:
+        print("  No all_metrics for GAIA levels social plot")
+        return
+
+    has_level = any(
+        "level_metrics" in m.extra and m.extra["level_metrics"]
+        for m in all_metrics
+    )
+    if not has_level:
+        print("  No GAIA level data for social levels plot")
+        return
+
+    df_sorted = sort_agents_by_provider_and_date(df)
+    agent_to_metrics = {m.agent_name: m for m in all_metrics}
+    agents_display = [strip_agent_prefix(a) for a in df_sorted["agent"]]
+    agents_full = df_sorted["agent"].tolist()
+    n_agents = len(agents_display)
+    y_pos = np.arange(n_agents)
+    levels = ["1", "2", "3"]
+    level_colors = {"1": "#4CAF50", "2": "#FF9800", "3": "#F44336"}
+    level_labels = {"1": "L1 (Easy)", "2": "L2 (Med)", "3": "L3 (Hard)"}
+    bar_w = 0.25
+
+    prev_rc = _social_font_setup()
+    _LM = 0.03
+    header_h, footer_h = 0.8, 0.6
+    body_h = max(4.5, n_agents * 0.4)
+    fig = plt.figure(
+        figsize=(10, header_h + body_h + footer_h + 0.2), facecolor=_BG_COLOR,
+    )
+    gs = gridspec.GridSpec(
+        3, 1, figure=fig,
+        height_ratios=[header_h, body_h, footer_h],
+        hspace=0.20, left=0.08, right=0.97, top=0.97, bottom=0.02,
+    )
+    _add_social_header(
+        fig, gs[0],
+        "Performance across GAIA difficulty levels",
+        "Accuracy and mean actions per task, broken out by "
+        "difficulty level for all models.",
+        left_margin=_LM,
+    )
+
+    inner = gs[1].subgridspec(1, 2, wspace=0.08)
+
+    # Left: accuracy by level
+    ax_l = fig.add_subplot(inner[0, 0])
+    for i, level in enumerate(levels):
+        vals, ses = [], []
+        for agent in agents_full:
+            m = agent_to_metrics.get(agent)
+            lm = m.extra.get("level_metrics", {}) if m else {}
+            val = lm.get("accuracy_by_level", {}).get(level, np.nan)
+            vals.append(val)
+            se = lm.get("accuracy_by_level_se", {}).get(level, 0.0)
+            ses.append(se if se and not np.isnan(se) else 0.0)
+        offset = (i - 1) * bar_w
+        xerr = np.array(ses)
+        ax_l.barh(
+            y_pos + offset, vals, bar_w,
+            label=level_labels[level], color=level_colors[level],
+            alpha=0.8, edgecolor="black", linewidth=0.5,
+            xerr=xerr if np.any(xerr > 0) else None, capsize=2,
+            error_kw={"linewidth": 0.8, "color": "black"},
+        )
+    ax_l.set_xlabel("Accuracy", fontsize=11, color=_COLOR_TEXT)
+    ax_l.set_yticks(y_pos)
+    ax_l.set_yticklabels(agents_display, fontsize=9)
+    ax_l.set_xlim(0, 1.05)
+    ax_l.invert_yaxis()
+    _style_social_scatter(ax_l, emphasized_y_spine=True)
+    ax_l.axvline(0, color="black", linewidth=1.5, zorder=1.5)
+
+    # Right: mean actions by level (shared y-axis)
+    ax_r = fig.add_subplot(inner[0, 1], sharey=ax_l)
+    max_traj = 0
+    for m in all_metrics:
+        td = m.extra.get("level_metrics", {}).get("trajectory_complexity", {})
+        for v in td.values():
+            if v and not np.isnan(v) and v > max_traj:
+                max_traj = v
+    for i, level in enumerate(levels):
+        vals, ses = [], []
+        for agent in agents_full:
+            m = agent_to_metrics.get(agent)
+            lm = m.extra.get("level_metrics", {}) if m else {}
+            val = lm.get("trajectory_complexity", {}).get(level, np.nan)
+            vals.append(val)
+            se = lm.get("trajectory_complexity_se", {}).get(level, 0.0)
+            ses.append(se if se and not np.isnan(se) else 0.0)
+        offset = (i - 1) * bar_w
+        xerr = np.array(ses)
+        ax_r.barh(
+            y_pos + offset, vals, bar_w,
+            label=level_labels[level], color=level_colors[level],
+            alpha=0.8, edgecolor="black", linewidth=0.5,
+            xerr=xerr if np.any(xerr > 0) else None, capsize=2,
+            error_kw={"linewidth": 0.8, "color": "black"},
+        )
+    ax_r.set_xlabel("Mean Actions", fontsize=11, color=_COLOR_TEXT)
+    plt.setp(ax_r.get_yticklabels(), visible=False)
+    ax_r.set_xlim(0, max(max_traj * 1.1, 10))
+    _style_social_scatter(ax_r, emphasized_y_spine=True)
+    ax_r.axvline(0, color="black", linewidth=1.5, zorder=1.5)
+    ax_r.legend(fontsize=8, loc="upper right", framealpha=0.8)
+
+    _add_social_footer_and_save(
+        fig, gs[-1], output_dir, "gaia_levels.pdf",
+        left_margin=_LM, padding=padding, prev_rc=prev_rc,
     )
